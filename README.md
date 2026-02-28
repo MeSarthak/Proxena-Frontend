@@ -43,7 +43,7 @@ npm install
 cp .env.example .env
 ```
 
-Fill in your Firebase web app credentials:
+Fill in your Firebase web app credentials and backend URL:
 
 ```env
 VITE_FIREBASE_API_KEY=your-api-key
@@ -52,6 +52,10 @@ VITE_FIREBASE_PROJECT_ID=your-project-id
 VITE_FIREBASE_STORAGE_BUCKET=your-project-id.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
 VITE_FIREBASE_APP_ID=your-app-id
+
+# Leave empty in development — Vite proxy handles it automatically.
+# Set to your deployed backend in production, e.g. https://api.yourdomain.com
+VITE_API_BASE_URL=
 ```
 
 ### 3. Start the development server

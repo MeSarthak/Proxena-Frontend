@@ -14,8 +14,12 @@ import type {
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
 
+// VITE_API_BASE_URL should be the backend origin (e.g. https://api.yourdomain.com).
+// In development it defaults to '' so Vite's proxy handles /v1/* → localhost:3000.
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
+
 export const api = axios.create({
-  baseURL: '/v1',
+  baseURL: `${API_BASE_URL}/v1`,
   timeout: 15_000,
 });
 
