@@ -13,7 +13,6 @@ export interface UserProfile {
   usageToday: {
     minutesUsed: number;
     sessionsCount: number;
-    dailyLimit: number;
     dailySessionLimit: number;
   };
 }
@@ -21,13 +20,27 @@ export interface UserProfile {
 // ─── Exercises ────────────────────────────────────────────────────────────────
 
 export type Difficulty = 'easy' | 'medium' | 'hard';
-export type Category = 'conversation' | 'storytelling' | 'emotions' | 'interview' | 'daily';
+export type Category =
+  | 'conversation'
+  | 'storytelling'
+  | 'emotions'
+  | 'interview'
+  | 'daily'
+  | 'business'
+  | 'news'
+  | 'travel'
+  | 'academic'
+  | 'tongue_twisters';
+
+export type Duration = 'short' | 'medium' | 'long';
 
 export interface Exercise {
   publicId: string;
   title: string;
   category: Category;
   difficulty: Difficulty;
+  duration?: Duration;
+  estimatedSeconds?: number;
 }
 
 export interface ExerciseDetail extends Exercise {
@@ -84,6 +97,24 @@ export interface Subscription {
   status: 'active' | 'expired' | 'cancelled';
   startedAt: string | null;
   expiresAt: string | null;
+}
+
+// ─── AI Recommendations ───────────────────────────────────────────────────────
+
+export interface WeakWord {
+  word: string;
+  avgAccuracy: number;
+  occurrences: number;
+  errorTypes: string[];
+}
+
+export interface WordRecommendation {
+  word: string;
+  avgAccuracy: number;
+  occurrences: number;
+  tip: string;
+  phonetic: string;
+  similarWords: string[];
 }
 
 // ─── WebSocket messages ───────────────────────────────────────────────────────

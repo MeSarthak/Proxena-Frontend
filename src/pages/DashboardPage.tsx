@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Clock, Zap, TrendingUp, Calendar, ChevronRight, Flame } from 'lucide-react';
+import { Play, Zap, TrendingUp, Calendar, ChevronRight, Flame, Bell, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authApi, sessionsApi } from '../lib/api';
 import type { UserProfile, SessionSummary } from '../types';
@@ -10,6 +10,46 @@ import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Alert } from '../components/ui/Alert';
 import { formatPercent, formatDate, formatDuration, scoreColor } from '../lib/utils';
+import { WordRecommendations } from '../components/WordRecommendations';
+import { WordOfTheDay } from '../components/WordOfTheDay';
+
+// ─── Reminder banner ──────────────────────────────────────────────────────────
+function ReminderBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <div className="mb-6 flex items-center gap-3 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
+      <Bell className="w-4 h-4 text-indigo-500 shrink-0" />
+      <p className="text-sm text-indigo-800 flex-1">
+        Time to practise! You set a reminder for this time.{' '}
+        <button
+          className="font-semibold underline hover:no-underline"
+          onClick={() => {}}
+        >
+          Start now
+        </button>
+      </p>
+      <button onClick={onDismiss} className="text-indigo-400 hover:text-indigo-600 transition-colors">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+function isReminderTime(): boolean {
+  try {
+    const stored = localStorage.getItem('proxena_reminder_time');
+    if (!stored) return false;
+    const [rh, rm] = stored.split(':').map(Number);
+    const now = new Date();
+    const nh = now.getHours();
+    const nm = now.getMinutes();
+    // Show banner if within 15 minutes of the reminder time
+    const reminderMinutes = rh * 60 + rm;
+    const nowMinutes = nh * 60 + nm;
+    return Math.abs(nowMinutes - reminderMinutes) <= 15;
+  } catch {
+    return false;
+  }
+}
 
 const QUOTES = [
   "The limits of my language mean the limits of my world. — Wittgenstein",
@@ -60,6 +100,7 @@ export default function DashboardPage() {
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [streak, setStreak] = useState<number>(0);
+  const [showReminder, setShowReminder] = useState(() => isReminderTime());
 
   const quote = QUOTES[new Date().getDay() % QUOTES.length];
 
@@ -100,8 +141,7 @@ export default function DashboardPage() {
   }, []);
 
   const usage = profile?.usageToday;
-  const minutesPct = usage ? Math.min(100, (usage.minutesUsed / usage.dailyLimit) * 100) : 0;
-  const limitReached = usage ? usage.minutesUsed >= usage.dailyLimit || usage.sessionsCount >= usage.dailySessionLimit : false;
+  const limitReached = usage ? usage.sessionsCount >= usage.dailySessionLimit : false;
 
   // Prefer Firebase displayName (set for Google OAuth users), fall back to email prefix
   const rawName = user?.displayName ?? user?.email?.split('@')[0] ?? 'there';
@@ -130,6 +170,10 @@ export default function DashboardPage() {
         <Alert variant="error" className="mb-6" onClose={() => setError(null)}>{error}</Alert>
       )}
 
+      {showReminder && (
+        <ReminderBanner onDismiss={() => setShowReminder(false)} />
+      )}
+
       {/* Stats row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {loadingProfile ? (
@@ -138,13 +182,6 @@ export default function DashboardPage() {
           ))
         ) : (
           <>
-            <StatCard
-              label="Minutes used today"
-              value={`${usage?.minutesUsed ?? 0} / ${usage?.dailyLimit ?? 5}`}
-              sub="minutes"
-              icon={Clock}
-              color="blue"
-            />
             <StatCard
               label="Sessions today"
               value={String(usage?.sessionsCount ?? 0)}
@@ -182,11 +219,11 @@ export default function DashboardPage() {
             )}
           </div>
           <ProgressBar
-            value={usage.minutesUsed}
-            max={usage.dailyLimit}
-            color={minutesPct >= 90 ? 'red' : minutesPct >= 60 ? 'yellow' : 'blue'}
+            value={usage.sessionsCount}
+            max={usage.dailySessionLimit}
+            color={usage.sessionsCount / usage.dailySessionLimit >= 0.9 ? 'red' : usage.sessionsCount / usage.dailySessionLimit >= 0.6 ? 'yellow' : 'blue'}
             size="md"
-            label={`${usage.minutesUsed} of ${usage.dailyLimit} minutes used`}
+            label={`${usage.sessionsCount} of ${usage.dailySessionLimit} sessions used`}
           />
           {limitReached && (
             <p className="text-xs text-gray-500 mt-2">
@@ -295,6 +332,10 @@ export default function DashboardPage() {
           </Card>
 
           <div className="mt-4">
+            <WordOfTheDay targetAccent={profile?.targetAccent ?? 'en-US'} />
+          </div>
+
+          <div className="mt-4">
             <h2 className="font-semibold text-gray-900 mb-3">Quick tips</h2>
             <Card className="p-4">
               <ul className="flex flex-col gap-2.5 text-sm text-gray-600">
@@ -314,6 +355,11 @@ export default function DashboardPage() {
             </Card>
           </div>
         </div>
+      </div>
+
+      {/* AI Word Coach — full width below the two-column grid */}
+      <div className="mt-6">
+        <WordRecommendations targetAccent={profile?.targetAccent ?? 'en-US'} />
       </div>
     </div>
   );

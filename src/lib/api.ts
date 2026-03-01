@@ -6,10 +6,12 @@ import type {
   ExerciseDetail,
   Category,
   Difficulty,
+  Duration,
   StartSessionResponse,
   SessionHistoryResponse,
   SessionDetail,
   Subscription,
+  WeakWord,
 } from '../types';
 
 // ─── Axios instance ───────────────────────────────────────────────────────────
@@ -43,7 +45,7 @@ export const authApi = {
 // ─── Exercises ────────────────────────────────────────────────────────────────
 
 export const exercisesApi = {
-  list: (params?: { category?: Category; difficulty?: Difficulty }): Promise<Exercise[]> =>
+  list: (params?: { category?: Category; difficulty?: Difficulty; duration?: Duration }): Promise<Exercise[]> =>
     api.get<Exercise[]>('/exercises', { params }).then((r) => r.data),
 
   get: (publicId: string): Promise<ExerciseDetail> =>
@@ -75,6 +77,13 @@ export const subscriptionApi = {
 
   upgrade: (): Promise<void> =>
     api.post('/subscription/upgrade').then(() => undefined),
+};
+
+// ─── Recommendations ──────────────────────────────────────────────────────────
+
+export const recommendationsApi = {
+  weakWords: (): Promise<WeakWord[]> =>
+    api.get<WeakWord[]>('/recommendations/weak-words').then((r) => r.data),
 };
 
 // ─── WebSocket URL helper ─────────────────────────────────────────────────────

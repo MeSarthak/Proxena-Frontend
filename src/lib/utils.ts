@@ -48,13 +48,32 @@ export function difficultyColor(d: string): string {
 
 export function categoryLabel(c: string): string {
   const map: Record<string, string> = {
-    conversation: 'Conversation',
-    storytelling:  'Storytelling',
-    emotions:      'Emotions',
-    interview:     'Interview',
-    daily:         'Daily Life',
+    conversation:    'Conversation',
+    storytelling:    'Storytelling',
+    emotions:        'Emotions',
+    interview:       'Interview',
+    daily:           'Daily Life',
+    business:        'Business',
+    news:            'News',
+    travel:          'Travel',
+    academic:        'Academic',
+    tongue_twisters: 'Tongue Twisters',
   };
   return map[c] ?? c;
+}
+
+export function durationLabel(d: string | undefined): string {
+  if (d === 'short')  return '~1 min';
+  if (d === 'medium') return '~3 min';
+  if (d === 'long')   return '~5 min+';
+  return '';
+}
+
+export function durationColor(d: string | undefined): string {
+  if (d === 'short')  return 'bg-blue-50 text-blue-600';
+  if (d === 'medium') return 'bg-purple-50 text-purple-600';
+  if (d === 'long')   return 'bg-orange-50 text-orange-600';
+  return 'bg-gray-50 text-gray-500';
 }
 
 export function motivationalFeedback(accuracy: number): string {

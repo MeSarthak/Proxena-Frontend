@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Settings } from 'lucide-react';
+import { Settings, Bell, Award } from 'lucide-react';
 import { authApi, api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
 import type { UserProfile } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Alert } from '../components/ui/Alert';
+import { useBadges } from '../hooks/useBadges';
 
 const LANGUAGES = [
   { value: 'Mandarin', label: 'Mandarin Chinese' },
@@ -44,6 +45,7 @@ const ACCENTS: { value: string; label: string; flag: string; region: string }[] 
 
 export default function SettingsPage() {
   const { markProfileComplete } = useAuth();
+  const { unlockedBadges, lockedBadges } = useBadges();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,6 +55,24 @@ export default function SettingsPage() {
 
   const [nativeLanguage, setNativeLanguage] = useState('');
   const [targetAccent, setTargetAccent] = useState('en-US');
+
+  // Reminder time
+  const [reminderTime, setReminderTime] = useState<string>(() => {
+    try { return localStorage.getItem('proxena_reminder_time') ?? ''; } catch { return ''; }
+  });
+  const [reminderSaved, setReminderSaved] = useState(false);
+
+  const handleSaveReminder = () => {
+    try {
+      if (reminderTime) {
+        localStorage.setItem('proxena_reminder_time', reminderTime);
+      } else {
+        localStorage.removeItem('proxena_reminder_time');
+      }
+      setReminderSaved(true);
+      setTimeout(() => setReminderSaved(false), 2000);
+    } catch { /* ignore */ }
+  };
 
   useEffect(() => {
     authApi.me()
@@ -179,6 +199,72 @@ export default function SettingsPage() {
           >
             Save changes
           </Button>
+
+          {/* Daily reminder */}
+          <Card className="mt-8">
+            <div className="flex items-center gap-2 mb-1">
+              <Bell className="w-4 h-4 text-indigo-500" />
+              <h2 className="font-semibold text-gray-900">Daily practice reminder</h2>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">
+              Set a time and the dashboard will show a reminder banner when it's time to practise.
+            </p>
+            <div className="flex items-center gap-3">
+              <input
+                type="time"
+                value={reminderTime}
+                onChange={(e) => setReminderTime(e.target.value)}
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+              />
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={handleSaveReminder}
+              >
+                {reminderSaved ? 'Saved!' : 'Save reminder'}
+              </Button>
+              {reminderTime && (
+                <button
+                  onClick={() => { setReminderTime(''); localStorage.removeItem('proxena_reminder_time'); }}
+                  className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </Card>
+
+          {/* Badge shelf */}
+          <Card className="mt-6">
+            <div className="flex items-center gap-2 mb-1">
+              <Award className="w-4 h-4 text-amber-500" />
+              <h2 className="font-semibold text-gray-900">Your badges</h2>
+              <span className="ml-auto text-xs text-gray-400">{unlockedBadges.length} / {unlockedBadges.length + lockedBadges.length} unlocked</span>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">Achievements earned from your practice sessions.</p>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+              {unlockedBadges.map((b) => (
+                <div
+                  key={b.id}
+                  title={b.description}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-amber-50 border border-amber-100"
+                >
+                  <span className="text-2xl">{b.emoji}</span>
+                  <span className="text-xs font-semibold text-amber-800 text-center leading-tight">{b.name}</span>
+                </div>
+              ))}
+              {lockedBadges.map((b) => (
+                <div
+                  key={b.id}
+                  title={b.description}
+                  className="flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-gray-50 border border-gray-100 opacity-50"
+                >
+                  <span className="text-2xl grayscale">{b.emoji}</span>
+                  <span className="text-xs font-medium text-gray-500 text-center leading-tight">{b.name}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
         </>
       )}
     </div>

@@ -7,13 +7,17 @@ import {
   LogOut,
   Mic2,
   Settings,
+  Trophy,
+  Zap,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
+import { useXP } from '../../hooks/useXP';
 
 const nav = [
   { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/exercises',    label: 'Exercises',    icon: BookOpen },
+  { to: '/challenges',   label: 'Challenges',   icon: Trophy },
   { to: '/analytics',   label: 'Analytics',    icon: BarChart2 },
   { to: '/subscription', label: 'Subscription', icon: CreditCard },
   { to: '/settings',    label: 'Settings',     icon: Settings },
@@ -27,6 +31,12 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { logOut } = useAuth();
   const navigate = useNavigate();
+  const { level, totalXP, progressPct, levelIndex } = useXP();
+
+  const LEVEL_COLORS = ['text-gray-500', 'text-blue-500', 'text-green-500', 'text-purple-500', 'text-amber-500'];
+  const BAR_COLORS   = ['bg-gray-400',   'bg-blue-500',   'bg-green-500',   'bg-purple-500',   'bg-amber-500'];
+  const levelColor = LEVEL_COLORS[levelIndex] ?? 'text-gray-500';
+  const barColor   = BAR_COLORS[levelIndex]   ?? 'bg-gray-400';
 
   const handleLogout = async () => {
     await logOut();
@@ -51,6 +61,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <Mic2 className="w-4 h-4 text-white" />
         </div>
         <span className="text-lg font-bold tracking-tight text-gray-900">Proxena</span>
+      </div>
+
+      {/* XP Level bar */}
+      <div className="px-4 pt-3 pb-2 border-b border-gray-100">
+        <div className="flex items-center gap-1.5 mb-1.5">
+          <Zap className={`w-3.5 h-3.5 shrink-0 ${levelColor}`} />
+          <span className={`text-xs font-semibold ${levelColor}`}>{level}</span>
+          <span className="ml-auto text-xs text-gray-400 tabular-nums">{totalXP} XP</span>
+        </div>
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
       </div>
 
       {/* Nav */}

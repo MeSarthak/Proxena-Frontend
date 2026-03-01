@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
-import { Mic, Square, ArrowLeft, AlertCircle, Clock, Volume2, VolumeX } from 'lucide-react';
+import { Mic, Square, ArrowLeft, AlertCircle, Clock, Volume2, VolumeX, Repeat } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
 import { useSpeechDemo } from '../hooks/useSpeechDemo';
 import { exercisesApi, authApi } from '../lib/api';
@@ -88,6 +88,8 @@ export default function SessionPage() {
   const { sessionPublicId } = useParams<{ sessionPublicId: string }>();
   const [searchParams] = useSearchParams();
   const exercisePublicId = searchParams.get('exercise');
+  const isShadowMode = searchParams.get('mode') === 'shadow';
+  const isChallenge = searchParams.get('challenge') === '1';
   const navigate = useNavigate();
   const location = useLocation();
   const locationState = location.state as { wsUrl?: string; maxDurationSeconds?: number } | null;
@@ -97,6 +99,10 @@ export default function SessionPage() {
   const [displayWords, setDisplayWords] = useState<DisplayWord[]>([]);
   const [targetAccent, setTargetAccent] = useState<string>('en-US');
   const maxSeconds = locationState?.maxDurationSeconds ?? 120;
+
+  // Shadowing mode state
+  // 'listening' = playing TTS demo, 'ready' = TTS done, user can now record
+  const [shadowPhase, setShadowPhase] = useState<'listening' | 'ready'>('listening');
 
   const { phase, liveWords, summary, errorMessage, startSession, stopSession } = useSession();
   const { speak, stop, speaking, supported: ttsSupported } = useSpeechDemo();
@@ -120,6 +126,22 @@ export default function SessionPage() {
       })
       .catch(() => {});
   }, [exercisePublicId]);
+
+  // Shadowing mode: auto-play TTS when exercise loads
+  useEffect(() => {
+    if (!isShadowMode || !exercise || !ttsSupported) return;
+    setShadowPhase('listening');
+    speak(exercise.textContent, targetAccent);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exercise, isShadowMode]);
+
+  // Shadowing mode: when TTS finishes, move to 'ready'
+  useEffect(() => {
+    if (!isShadowMode) return;
+    if (!speaking && shadowPhase === 'listening' && exercise) {
+      setShadowPhase('ready');
+    }
+  }, [speaking, isShadowMode, shadowPhase, exercise]);
 
   // Sync live word results → display words
   useEffect(() => {
@@ -152,9 +174,13 @@ export default function SessionPage() {
   // Navigate to summary when done
   useEffect(() => {
     if (phase === 'done' && summary && sessionPublicId) {
-      navigate(`/sessions/${sessionPublicId}`, { state: { summary } });
+      const params = new URLSearchParams();
+      if (isChallenge) params.set('challenge', '1');
+      if (isShadowMode) params.set('mode', 'shadow');
+      const query = params.toString() ? `?${params.toString()}` : '';
+      navigate(`/sessions/${sessionPublicId}${query}`, { state: { summary } });
     }
-  }, [phase, summary, sessionPublicId, navigate]);
+  }, [phase, summary, sessionPublicId, navigate, isChallenge, isShadowMode]);
 
   // Space bar shortcut: start or stop recording
   useEffect(() => {
@@ -187,9 +213,19 @@ export default function SessionPage() {
     if (!exercise) return;
     if (speaking) {
       stop();
+      if (isShadowMode) setShadowPhase('ready');
     } else {
       speak(exercise.textContent, targetAccent);
+      if (isShadowMode) setShadowPhase('listening');
     }
+  };
+
+  // For shadowing: replay the demo
+  const handleReplay = () => {
+    if (!exercise) return;
+    stop();
+    setShadowPhase('listening');
+    speak(exercise.textContent, targetAccent);
   };
 
   const isIdle       = phase === 'idle';
@@ -233,6 +269,11 @@ export default function SessionPage() {
 
         <div className="flex items-center gap-4">
           <CountdownTimer running={isRecording} maxSeconds={maxSeconds} />
+          {isShadowMode && (
+            <span className="hidden sm:flex items-center gap-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 px-2.5 py-1 rounded-full">
+              <Repeat className="w-3.5 h-3.5" /> Shadowing Mode
+            </span>
+          )}
           {exercise && (
             <span className="text-sm font-medium text-gray-700 hidden sm:block">
               {exercise.title}
@@ -283,30 +324,53 @@ export default function SessionPage() {
                   </p>
                 </div>
 
-                {/* Demo speech button — only when idle/error and TTS supported */}
+                {/* Demo speech button / Shadowing controls */}
                 {ttsSupported && (isIdle || phase === 'error') && (
-                  <button
-                    onClick={handleDemo}
-                    title={speaking ? 'Stop demo' : `Hear ${accentLabel} accent demo`}
-                    className={cn(
-                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-all duration-150',
-                      speaking
-                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
-                    )}
-                  >
-                    {speaking ? (
-                      <>
-                        <VolumeX className="w-3.5 h-3.5" />
-                        Stop demo
-                      </>
-                    ) : (
-                      <>
-                        <Volume2 className="w-3.5 h-3.5" />
-                        Hear {accentLabel} demo
-                      </>
-                    )}
-                  </button>
+                  isShadowMode ? (
+                    // Shadowing mode: show listening indicator or replay button
+                    <div className="flex items-center gap-2 shrink-0">
+                      {shadowPhase === 'listening' ? (
+                        <button
+                          onClick={() => { stop(); setShadowPhase('ready'); }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-colors"
+                        >
+                          <VolumeX className="w-3.5 h-3.5" />
+                          Stop listening
+                        </button>
+                      ) : (
+                        <button
+                          onClick={handleReplay}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-600 hover:bg-indigo-50 hover:text-indigo-700 transition-colors"
+                        >
+                          <Volume2 className="w-3.5 h-3.5" />
+                          Replay demo
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleDemo}
+                      title={speaking ? 'Stop demo' : `Hear ${accentLabel} accent demo`}
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-all duration-150',
+                        speaking
+                          ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                      )}
+                    >
+                      {speaking ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5" />
+                          Stop demo
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5" />
+                          Hear {accentLabel} demo
+                        </>
+                      )}
+                    </button>
+                  )
                 )}
               </div>
             )}
@@ -353,10 +417,12 @@ export default function SessionPage() {
             {isIdle || phase === 'error' ? (
               <button
                 onClick={handleStart}
-                disabled={!exercise || phase === 'error'}
+                disabled={!exercise || phase === 'error' || (isShadowMode && shadowPhase === 'listening')}
                 className={cn(
                   'w-20 h-20 rounded-full flex items-center justify-center transition-all duration-200',
-                  'bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-lg',
+                  isShadowMode && shadowPhase === 'ready'
+                    ? 'bg-indigo-600 hover:bg-indigo-700 active:scale-95 shadow-lg'
+                    : 'bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-lg',
                   'disabled:opacity-40 disabled:cursor-not-allowed',
                 )}
               >
@@ -381,7 +447,9 @@ export default function SessionPage() {
 
             {/* Status label */}
             <p className="text-sm text-gray-500 text-center">
-              {isIdle       && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start — or press Space')}
+              {isIdle && isShadowMode && shadowPhase === 'listening' && 'Listen carefully to the model pronunciation...'}
+              {isIdle && isShadowMode && shadowPhase === 'ready'    && 'Now try to shadow it — tap the microphone when ready'}
+              {isIdle && !isShadowMode && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start — or press Space')}
               {isConnecting && 'Connecting to AI coach...'}
               {isRecording  && 'Listening — speak clearly and at a natural pace'}
               {isProcessing && 'Analysing your pronunciation...'}
@@ -389,9 +457,11 @@ export default function SessionPage() {
             </p>
 
             {/* Mic permission note */}
-            {isIdle && !speaking && (
+            {isIdle && !speaking && shadowPhase !== 'listening' && (
               <p className="text-xs text-gray-400 text-center max-w-sm">
-                Your browser will ask for microphone permission. Audio is processed securely and never stored.
+                {isShadowMode
+                  ? 'Try to copy the exact rhythm, tone, and sounds you just heard.'
+                  : 'Your browser will ask for microphone permission. Audio is processed securely and never stored.'}
               </p>
             )}
           </div>

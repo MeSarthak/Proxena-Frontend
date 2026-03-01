@@ -1,28 +1,40 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Play, BookOpen, Volume2, VolumeX } from 'lucide-react';
+import { Search, Play, BookOpen, Volume2, VolumeX, Clock, Repeat } from 'lucide-react';
 import { exercisesApi, sessionsApi, authApi } from '../lib/api';
-import type { Exercise, Category, Difficulty } from '../types';
+import type { Exercise, Category, Difficulty, Duration } from '../types';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Alert } from '../components/ui/Alert';
-import { difficultyColor, categoryLabel } from '../lib/utils';
+import { difficultyColor, categoryLabel, durationLabel, durationColor } from '../lib/utils';
 import { useSpeechDemo } from '../hooks/useSpeechDemo';
 
-const CATEGORIES: { value: Category | ''; label: string }[] = [
-  { value: '', label: 'All categories' },
-  { value: 'conversation', label: 'Conversation' },
-  { value: 'storytelling',  label: 'Storytelling' },
-  { value: 'emotions',      label: 'Emotions' },
-  { value: 'interview',     label: 'Interview' },
-  { value: 'daily',         label: 'Daily Life' },
+const CATEGORIES: { value: Category | ''; label: string; emoji: string }[] = [
+  { value: '',                label: 'All categories',  emoji: '🗂️' },
+  { value: 'conversation',   label: 'Conversation',    emoji: '💬' },
+  { value: 'storytelling',   label: 'Storytelling',    emoji: '📖' },
+  { value: 'emotions',       label: 'Emotions',        emoji: '💭' },
+  { value: 'interview',      label: 'Interview',       emoji: '🎙️' },
+  { value: 'daily',          label: 'Daily Life',      emoji: '☀️' },
+  { value: 'business',       label: 'Business',        emoji: '💼' },
+  { value: 'news',           label: 'News',            emoji: '📰' },
+  { value: 'travel',         label: 'Travel',          emoji: '✈️' },
+  { value: 'academic',       label: 'Academic',        emoji: '🎓' },
+  { value: 'tongue_twisters', label: 'Tongue Twisters', emoji: '🌀' },
 ];
 
 const DIFFICULTIES: { value: Difficulty | ''; label: string }[] = [
-  { value: '', label: 'All levels' },
+  { value: '',       label: 'All levels' },
   { value: 'easy',   label: 'Easy' },
   { value: 'medium', label: 'Medium' },
   { value: 'hard',   label: 'Hard' },
+];
+
+const DURATIONS: { value: Duration | ''; label: string; sub: string }[] = [
+  { value: '',       label: 'Any length', sub: '' },
+  { value: 'short',  label: 'Short',  sub: '~1 min' },
+  { value: 'medium', label: 'Medium', sub: '~3 min' },
+  { value: 'long',   label: 'Long',   sub: '5 min+' },
 ];
 
 const ACCENT_LABELS: Record<string, string> = {
@@ -53,6 +65,7 @@ export default function ExercisesPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<Category | ''>('');
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
+  const [duration, setDuration] = useState<Duration | ''>('');
   const [targetAccent, setTargetAccent] = useState<string>('en-US');
   const [limitReached, setLimitReached] = useState(false);
   // Per-card demo loading & playing state
@@ -69,11 +82,12 @@ export default function ExercisesPage() {
       .list({
         ...(category ? { category } : {}),
         ...(difficulty ? { difficulty } : {}),
+        ...(duration ? { duration } : {}),
       })
       .then(setExercises)
       .catch(() => setError('Failed to load exercises. Please refresh.'))
       .finally(() => setLoading(false));
-  }, [category, difficulty]);
+  }, [category, difficulty, duration]);
 
   // Fetch user's target accent and usage limit once
   useEffect(() => {
@@ -81,7 +95,7 @@ export default function ExercisesPage() {
       .then((p) => {
         if (p.targetAccent) setTargetAccent(p.targetAccent);
         const u = p.usageToday;
-        if (u && (u.minutesUsed >= u.dailyLimit || u.sessionsCount >= u.dailySessionLimit)) {
+        if (u && u.sessionsCount >= u.dailySessionLimit) {
           setLimitReached(true);
         }
       })
@@ -97,15 +111,15 @@ export default function ExercisesPage() {
     !search || ex.title?.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const handleStart = async (publicId: string) => {
+  const handleStart = async (publicId: string, mode?: 'shadow') => {
     setError(null);
     setStarting(publicId);
-    // Stop any demo that's playing
     stop();
     setDemoPlaying(null);
     try {
       const { sessionPublicId, wsUrl, maxDurationSeconds } = await sessionsApi.start(publicId);
-      navigate(`/session/${sessionPublicId}?exercise=${publicId}`, {
+      const modeParam = mode ? `&mode=${mode}` : '';
+      navigate(`/session/${sessionPublicId}?exercise=${publicId}${modeParam}`, {
         state: { wsUrl, maxDurationSeconds },
       });
     } catch (err: unknown) {
@@ -123,18 +137,14 @@ export default function ExercisesPage() {
   };
 
   const handleDemo = async (publicId: string) => {
-    // If this card is already playing, stop it
     if (demoPlaying === publicId) {
       stop();
       setDemoPlaying(null);
       return;
     }
-
-    // Stop any other card that's playing
     stop();
     setDemoPlaying(null);
 
-    // Get the text — from cache or fetch
     let text = textCache.current[publicId];
     if (!text) {
       setDemoLoading(publicId);
@@ -184,8 +194,26 @@ export default function ExercisesPage() {
         </Alert>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-wrap gap-3 mb-6">
+      {/* Category genre pills */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {CATEGORIES.map((c) => (
+          <button
+            key={c.value}
+            onClick={() => setCategory(c.value as Category | '')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-150 ${
+              category === c.value
+                ? 'bg-blue-600 border-blue-600 text-white shadow-sm'
+                : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <span>{c.emoji}</span>
+            {c.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Filters row */}
+      <div className="flex flex-wrap gap-3 mb-4">
         {/* Search */}
         <div className="relative flex-1 min-w-48">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -198,17 +226,6 @@ export default function ExercisesPage() {
           />
         </div>
 
-        {/* Category */}
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value as Category | '')}
-          className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c.value} value={c.value}>{c.label}</option>
-          ))}
-        </select>
-
         {/* Difficulty */}
         <select
           value={difficulty}
@@ -217,6 +234,19 @@ export default function ExercisesPage() {
         >
           {DIFFICULTIES.map((d) => (
             <option key={d.value} value={d.value}>{d.label}</option>
+          ))}
+        </select>
+
+        {/* Duration */}
+        <select
+          value={duration}
+          onChange={(e) => setDuration(e.target.value as Duration | '')}
+          className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-colors"
+        >
+          {DURATIONS.map((d) => (
+            <option key={d.value} value={d.value}>
+              {d.label}{d.sub ? ` (${d.sub})` : ''}
+            </option>
           ))}
         </select>
       </div>
@@ -250,9 +280,9 @@ export default function ExercisesPage() {
               key={ex.publicId}
               className="card p-5 flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
             >
-              {/* Category + difficulty */}
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
+              {/* Top row: category badge + demo button */}
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="blue">{categoryLabel(ex.category)}</Badge>
                   <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${difficultyColor(ex.difficulty)}`}>
                     {ex.difficulty.charAt(0).toUpperCase() + ex.difficulty.slice(1)}
@@ -282,20 +312,43 @@ export default function ExercisesPage() {
                 )}
               </div>
 
+              {/* Duration badge */}
+              {ex.duration && (
+                <div className="mb-3">
+                  <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${durationColor(ex.duration)}`}>
+                    <Clock className="w-3 h-3" />
+                    {durationLabel(ex.duration)}
+                  </span>
+                </div>
+              )}
+
               {/* Title */}
               <h3 className="font-semibold text-gray-900 text-sm flex-1 mb-4">{ex.title}</h3>
 
               {/* CTA */}
-              <Button
-                size="sm"
-                className="w-full"
-                loading={starting === ex.publicId}
-                disabled={limitReached}
-                onClick={() => handleStart(ex.publicId)}
-              >
-                <Play className="w-3.5 h-3.5" />
-                {limitReached ? 'Limit reached' : 'Start practice'}
-              </Button>
+              <div className="flex gap-2 mt-auto">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  loading={starting === ex.publicId}
+                  disabled={limitReached}
+                  onClick={() => handleStart(ex.publicId)}
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  {limitReached ? 'Limit reached' : 'Start'}
+                </Button>
+                {ttsSupported && (
+                  <button
+                    title="Shadowing mode — listen first, then repeat"
+                    disabled={limitReached || starting === ex.publicId}
+                    onClick={() => handleStart(ex.publicId, 'shadow')}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-medium border border-indigo-200 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Repeat className="w-3.5 h-3.5" />
+                    Shadow
+                  </button>
+                )}
+              </div>
             </div>
           ))}
       </div>

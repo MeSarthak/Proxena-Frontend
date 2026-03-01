@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, LayoutDashboard, CheckCircle, AlertCircle, MinusCircle, Repeat2 } from 'lucide-react';
+import { useNavigate, useParams, useLocation, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, RefreshCw, LayoutDashboard, CheckCircle, AlertCircle, MinusCircle, Repeat2, Star, Zap } from 'lucide-react';
 import { sessionsApi } from '../lib/api';
 import type { SessionDetail, WsSummaryMessage } from '../types';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
+import { WordRecommendations } from '../components/WordRecommendations';
+import { MilestoneToast, useToasts } from '../components/MilestoneToast';
+import { useXP, xpForSession } from '../hooks/useXP';
+import { useBadges } from '../hooks/useBadges';
 import {
   formatPercent,
   formatDate,
@@ -19,6 +23,21 @@ import {
   RadialBar,
   ResponsiveContainer,
 } from 'recharts';
+
+// ─── Challenge score recording ────────────────────────────────────────────────
+function recordChallengeScore(exercisePublicId: string, accuracy: number) {
+  try {
+    const stored = localStorage.getItem('proxena_challenge');
+    const record = stored
+      ? (JSON.parse(stored) as { weekKey: string; scores: Record<string, number> })
+      : { weekKey: '', scores: {} };
+    const prev = record.scores[exercisePublicId];
+    if (prev == null || accuracy > prev) {
+      record.scores[exercisePublicId] = accuracy;
+      localStorage.setItem('proxena_challenge', JSON.stringify(record));
+    }
+  } catch { /* ignore */ }
+}
 
 function ScoreRing({
   value,
@@ -87,10 +106,18 @@ export default function SessionSummaryPage() {
   const { publicId } = useParams<{ publicId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isChallenge = searchParams.get('challenge') === '1';
+  const isShadowing = searchParams.get('mode') === 'shadow';
 
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [restarting, setRestarting] = useState(false);
+  const [xpEarned, setXpEarned] = useState<number | null>(null);
+
+  const { toasts, addToast, dismiss } = useToasts();
+  const { addXP, totalXP } = useXP();
+  const { checkAndUnlock } = useBadges();
 
   // The speaking page may pass summary inline via state to avoid extra fetch
   const inlineSummary = (location.state as { summary?: WsSummaryMessage } | null)?.summary;
@@ -115,6 +142,57 @@ export default function SessionSummaryPage() {
       setRestarting(false);
     }
   };
+
+  // Award XP + check badges once session loads
+  const hasAwarded = useState(false);
+  useEffect(() => {
+    if (!session || hasAwarded[0]) return;
+    hasAwarded[1](true);
+
+    const acc = session.overallAccuracy;
+    const earned = xpForSession(acc);
+    setXpEarned(earned);
+    const { didLevelUp, newLevel } = addXP(earned);
+
+    // Record challenge best score
+    if (isChallenge && session.exercisePublicId && acc != null) {
+      recordChallengeScore(session.exercisePublicId, acc);
+    }
+
+    // Fetch streak + total sessions for badge check
+    Promise.all([
+      sessionsApi.history(1, 100),
+    ]).then(([hist]) => {
+      const days = new Set(
+        hist.sessions.map((s) => new Date(s.createdAt).toLocaleDateString('en-CA')),
+      );
+      let streak = 0;
+      const cursor = new Date();
+      while (true) {
+        const key = cursor.toLocaleDateString('en-CA');
+        if (days.has(key)) { streak++; cursor.setDate(cursor.getDate() - 1); }
+        else break;
+      }
+
+      const newBadges = checkAndUnlock({
+        totalSessions: hist.pagination.total,
+        sessionAccuracy: acc,
+        streak,
+        totalXP: totalXP + earned,
+        completedChallenge: isChallenge,
+        completedShadowing: isShadowing,
+      });
+
+      // Show toasts
+      if (didLevelUp) {
+        addToast({ emoji: '⬆️', title: 'Level up!', message: `You reached ${newLevel}!`, color: 'purple' });
+      }
+      for (const badge of newBadges) {
+        addToast({ emoji: badge.emoji, title: badge.name, message: badge.description, color: 'amber' });
+      }
+    }).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   if (loading) {
     return (
@@ -158,6 +236,16 @@ export default function SessionSummaryPage() {
         {feedback && (
           <div className="mb-6 p-5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl">
             <p className="text-blue-800 font-medium text-sm">{feedback}</p>
+          </div>
+        )}
+
+        {/* XP earned banner */}
+        {xpEarned != null && (
+          <div className="mb-4 flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+            <Zap className="w-4 h-4 text-amber-500 shrink-0" />
+            <span className="text-sm text-amber-800 font-medium">+{xpEarned} XP earned this session</span>
+            {isChallenge && <span className="ml-auto text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full font-medium flex items-center gap-1"><Star className="w-3 h-3" />Challenge</span>}
+            {isShadowing && <span className="ml-auto text-xs text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-full font-medium">Shadowing</span>}
           </div>
         )}
 
@@ -227,6 +315,11 @@ export default function SessionSummaryPage() {
           </Card>
         )}
 
+        {/* AI Word Coach */}
+        <div className="mb-6">
+          <WordRecommendations />
+        </div>
+
         {/* Actions */}
         <div className="flex gap-3 flex-wrap">
           {session?.exercisePublicId && (
@@ -255,6 +348,9 @@ export default function SessionSummaryPage() {
           </Button>
         </div>
       </main>
+
+      {/* Milestone toasts */}
+      <MilestoneToast toasts={toasts} onDismiss={dismiss} />
     </div>
   );
 }
