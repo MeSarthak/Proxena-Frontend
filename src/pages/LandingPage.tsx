@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Zap, BarChart2, Globe, CheckCircle, ArrowRight,
+  BarChart2, Globe, CheckCircle, ArrowRight,
   Star, ChevronDown, Play, Volume2, Target, TrendingUp,
   Twitter, Github, Linkedin, Mic,
 } from 'lucide-react';
