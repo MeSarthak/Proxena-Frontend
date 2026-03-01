@@ -94,8 +94,9 @@ export interface SessionHistoryResponse {
 
 export interface Subscription {
   planType: 'free' | 'pro';
+  displayName: string;
   status: 'active' | 'expired' | 'cancelled';
-  startedAt: string | null;
+  dailySessionLimit: number;
   expiresAt: string | null;
 }
 

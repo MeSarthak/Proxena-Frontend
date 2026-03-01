@@ -98,7 +98,7 @@ export default function SessionPage() {
   const [loadingExercise, setLoadingExercise] = useState(true);
   const [displayWords, setDisplayWords] = useState<DisplayWord[]>([]);
   const [targetAccent, setTargetAccent] = useState<string>('en-US');
-  const maxSeconds = locationState?.maxDurationSeconds ?? 120;
+  const maxSeconds = locationState?.maxDurationSeconds ?? 1800;
 
   // Shadowing mode state
   // 'listening' = playing TTS demo, 'ready' = TTS done, user can now record

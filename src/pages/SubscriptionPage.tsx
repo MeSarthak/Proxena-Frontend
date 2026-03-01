@@ -9,7 +9,7 @@ import { Alert } from '../components/ui/Alert';
 import { formatDate } from '../lib/utils';
 
 const FREE_FEATURES = [
-  '5 minutes of practice per day',
+  '30 minutes of practice per day',
   'Up to 3 sessions per day',
   'Real-time word-level feedback',
   'Session history (last 10)',
@@ -51,7 +51,7 @@ const ALL_FEATURES = [
   'Early access',
 ];
 
-const FREE_HAS  = [false, false, true,  false, false, false, false];
+const FREE_HAS  = [true,  false, true,  false, false, false, false];
 const PRO_HAS   = [true,  true,  true,  true,  true,  true,  true ];
 
 export default function SubscriptionPage() {
@@ -114,7 +114,7 @@ export default function SubscriptionPage() {
               )}
               {!isPro && (
                 <p className="text-sm text-gray-500 mt-2">
-                  You're on the free plan — limited to 5 min/day and 3 sessions/day.
+                  You're on the free plan — up to 30 min/session and 3 sessions/day.
                 </p>
               )}
             </div>
@@ -200,7 +200,7 @@ export default function SubscriptionPage() {
                 <tr key={f}>
                   <td className="py-3 text-gray-700">{f}</td>
                   <td className="py-3 text-center">
-                    {i === 0 ? <span className="text-gray-500 text-xs">5 min</span>
+                    {i === 0 ? <span className="text-gray-500 text-xs">30 min</span>
                     : i === 1 ? <span className="text-gray-500 text-xs">3/day</span>
                     : FREE_HAS[i]
                       ? <Check className="w-4 h-4 text-green-500 mx-auto" />
