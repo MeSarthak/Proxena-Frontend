@@ -68,20 +68,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleGoogle = async () => {
-    setError(null);
-    setGoogleLoading(true);
-    try {
-      await signInWithGoogle();
-      navigate('/dashboard');
-    } catch (err: unknown) {
-      const code = (err as { code?: string }).code ?? '';
-      setError(getErrorMessage(code));
-    } finally {
-      setGoogleLoading(false);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md fade-in">
