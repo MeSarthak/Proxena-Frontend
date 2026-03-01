@@ -13,6 +13,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   signOut,
+  getAdditionalUserInfo,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
 import { api } from '../lib/api';
@@ -26,7 +27,8 @@ interface AuthContextValue {
   markProfileComplete: () => void;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  signInWithGoogle: () => Promise<void>;
+  /** Returns true if the Google sign-in created a brand-new account. */
+  signInWithGoogle: () => Promise<boolean>;
   logOut: () => Promise<void>;
   getIdToken: () => Promise<string | null>;
 }
@@ -78,8 +80,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signInWithGoogle = async () => {
-    await signInWithPopup(auth, googleProvider);
+  const signInWithGoogle = async (): Promise<boolean> => {
+    const result = await signInWithPopup(auth, googleProvider);
+    const info = getAdditionalUserInfo(result);
+    return info?.isNewUser ?? false;
   };
 
   const logOut = async () => {

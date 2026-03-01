@@ -139,6 +139,16 @@ export default function SessionPage() {
     });
   }, [liveWords]);
 
+  // Auto-stop when every word has been scored (none left as 'pending')
+  useEffect(() => {
+    if (phase !== 'recording') return;
+    if (displayWords.length === 0) return;
+    const allScored = displayWords.every((dw) => dw.status !== 'pending');
+    if (allScored) {
+      stopSession();
+    }
+  }, [displayWords, phase, stopSession]);
+
   // Navigate to summary when done
   useEffect(() => {
     if (phase === 'done' && summary && sessionPublicId) {

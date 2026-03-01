@@ -822,7 +822,7 @@ export default function LandingPage() {
                   <span className="text-xs bg-white/20 text-white px-2.5 py-0.5 rounded-full font-medium">Most popular</span>
                 </div>
                 <div className="text-4xl font-extrabold text-white mt-3">
-                  $12
+                  $2
                   <span className="text-base font-normal text-blue-200"> / month</span>
                 </div>
                 <p className="text-blue-200 text-sm mt-2">For serious learners</p>

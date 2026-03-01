@@ -42,6 +42,7 @@ export default function LoginPage() {
         navigate('/dashboard');
       } else {
         await signUp(email, password);
+        // New registrations always go through profile setup first
         navigate('/setup');
       }
     } catch (err: unknown) {
@@ -49,6 +50,21 @@ export default function LoginPage() {
       setError(getErrorMessage(code));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setError(null);
+    setGoogleLoading(true);
+    try {
+      const isNew = await signInWithGoogle();
+      // signInWithGoogle now returns true when the account was just created
+      navigate(isNew ? '/setup' : '/dashboard');
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code ?? '';
+      setError(getErrorMessage(code));
+    } finally {
+      setGoogleLoading(false);
     }
   };
 
