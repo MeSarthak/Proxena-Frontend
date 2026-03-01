@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Play, BookOpen } from 'lucide-react';
-import { exercisesApi, sessionsApi } from '../lib/api';
+import { Search, Play, BookOpen, Volume2, VolumeX } from 'lucide-react';
+import { exercisesApi, sessionsApi, authApi } from '../lib/api';
 import type { Exercise, Category, Difficulty } from '../types';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { Alert } from '../components/ui/Alert';
 import { difficultyColor, categoryLabel } from '../lib/utils';
+import { useSpeechDemo } from '../hooks/useSpeechDemo';
 
 const CATEGORIES: { value: Category | ''; label: string }[] = [
   { value: '', label: 'All categories' },
@@ -23,6 +24,15 @@ const DIFFICULTIES: { value: Difficulty | ''; label: string }[] = [
   { value: 'medium', label: 'Medium' },
   { value: 'hard',   label: 'Hard' },
 ];
+
+const ACCENT_LABELS: Record<string, string> = {
+  'en-US': 'American',
+  'en-GB': 'British',
+  'en-AU': 'Australian',
+  'en-IN': 'Indian',
+  'en-CA': 'Canadian',
+  'en-IE': 'Irish',
+};
 
 function ExerciseCardSkeleton() {
   return (
@@ -43,6 +53,14 @@ export default function ExercisesPage() {
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<Category | ''>('');
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
+  const [targetAccent, setTargetAccent] = useState<string>('en-US');
+  // Per-card demo loading & playing state
+  const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [demoPlaying, setDemoPlaying] = useState<string | null>(null);
+  // Cache fetched full text so repeat taps don't re-fetch
+  const textCache = useRef<Record<string, string>>({});
+
+  const { speak, stop, speaking, supported: ttsSupported } = useSpeechDemo();
 
   useEffect(() => {
     setLoading(true);
@@ -56,6 +74,18 @@ export default function ExercisesPage() {
       .finally(() => setLoading(false));
   }, [category, difficulty]);
 
+  // Fetch user's target accent once
+  useEffect(() => {
+    authApi.me()
+      .then((p) => { if (p.targetAccent) setTargetAccent(p.targetAccent); })
+      .catch(() => {});
+  }, []);
+
+  // When speech ends naturally, clear the playing indicator
+  useEffect(() => {
+    if (!speaking) setDemoPlaying(null);
+  }, [speaking]);
+
   const filtered = exercises.filter((ex) =>
     !search || ex.title?.toLowerCase().includes(search.toLowerCase()),
   );
@@ -63,6 +93,9 @@ export default function ExercisesPage() {
   const handleStart = async (publicId: string) => {
     setError(null);
     setStarting(publicId);
+    // Stop any demo that's playing
+    stop();
+    setDemoPlaying(null);
     try {
       const { sessionPublicId, wsUrl, maxDurationSeconds } = await sessionsApi.start(publicId);
       navigate(`/session/${sessionPublicId}?exercise=${publicId}`, {
@@ -80,6 +113,39 @@ export default function ExercisesPage() {
       setStarting(null);
     }
   };
+
+  const handleDemo = async (publicId: string) => {
+    // If this card is already playing, stop it
+    if (demoPlaying === publicId) {
+      stop();
+      setDemoPlaying(null);
+      return;
+    }
+
+    // Stop any other card that's playing
+    stop();
+    setDemoPlaying(null);
+
+    // Get the text — from cache or fetch
+    let text = textCache.current[publicId];
+    if (!text) {
+      setDemoLoading(publicId);
+      try {
+        const detail = await exercisesApi.get(publicId);
+        text = detail.textContent;
+        textCache.current[publicId] = text;
+      } catch {
+        setDemoLoading(null);
+        return;
+      }
+      setDemoLoading(null);
+    }
+
+    setDemoPlaying(publicId);
+    speak(text, targetAccent);
+  };
+
+  const accentLabel = ACCENT_LABELS[targetAccent] ?? targetAccent;
 
   return (
     <div className="max-w-5xl mx-auto fade-in">
@@ -138,6 +204,11 @@ export default function ExercisesPage() {
       {!loading && (
         <p className="text-xs text-gray-500 mb-4">
           {filtered.length} exercise{filtered.length !== 1 ? 's' : ''} found
+          {ttsSupported && (
+            <span className="ml-2 text-gray-400">
+              · tap <Volume2 className="w-3 h-3 inline-block mx-0.5 -mt-0.5" /> to hear a {accentLabel} accent demo
+            </span>
+          )}
         </p>
       )}
 
@@ -159,11 +230,35 @@ export default function ExercisesPage() {
               className="card p-5 flex flex-col hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
             >
               {/* Category + difficulty */}
-              <div className="flex items-center gap-2 mb-3">
-                <Badge variant="blue">{categoryLabel(ex.category)}</Badge>
-                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${difficultyColor(ex.difficulty)}`}>
-                  {ex.difficulty.charAt(0).toUpperCase() + ex.difficulty.slice(1)}
-                </span>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                  <Badge variant="blue">{categoryLabel(ex.category)}</Badge>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${difficultyColor(ex.difficulty)}`}>
+                    {ex.difficulty.charAt(0).toUpperCase() + ex.difficulty.slice(1)}
+                  </span>
+                </div>
+
+                {/* Demo button */}
+                {ttsSupported && (
+                  <button
+                    onClick={() => handleDemo(ex.publicId)}
+                    disabled={demoLoading === ex.publicId}
+                    title={demoPlaying === ex.publicId ? 'Stop demo' : `Hear ${accentLabel} accent demo`}
+                    className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+                      demoPlaying === ex.publicId
+                        ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                        : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
+                    } disabled:opacity-40`}
+                  >
+                    {demoLoading === ex.publicId ? (
+                      <div className="w-3.5 h-3.5 border border-gray-400 border-t-transparent rounded-full animate-spin" />
+                    ) : demoPlaying === ex.publicId ? (
+                      <VolumeX className="w-3.5 h-3.5" />
+                    ) : (
+                      <Volume2 className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                )}
               </div>
 
               {/* Title */}

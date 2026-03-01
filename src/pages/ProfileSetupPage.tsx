@@ -15,14 +15,16 @@ const LANGUAGES = [
 ].map((l) => ({ value: l, label: l }));
 
 const ACCENTS = [
-  { value: 'en-US', label: 'American English', flag: '🇺🇸' },
-  { value: 'en-GB', label: 'British English', flag: '🇬🇧' },
-  { value: 'en-AU', label: 'Australian English', flag: '🇦🇺' },
-  { value: 'en-IN', label: 'Indian English', flag: '🇮🇳' },
+  { value: 'en-US', label: 'American English',   flag: '🇺🇸', sub: 'General American' },
+  { value: 'en-GB', label: 'British English',    flag: '🇬🇧', sub: 'Received Pronunciation' },
+  { value: 'en-AU', label: 'Australian English', flag: '🇦🇺', sub: 'General Australian' },
+  { value: 'en-IN', label: 'Indian English',     flag: '🇮🇳', sub: 'Standard Indian' },
+  { value: 'en-CA', label: 'Canadian English',   flag: '🇨🇦', sub: 'General Canadian' },
+  { value: 'en-IE', label: 'Irish English',      flag: '🇮🇪', sub: 'Hiberno-English' },
 ];
 
 export default function ProfileSetupPage() {
-  const { user } = useAuth();
+  const { user, markProfileComplete } = useAuth();
   const navigate = useNavigate();
 
   const [nativeLanguage, setNativeLanguage] = useState('');
@@ -38,6 +40,7 @@ export default function ProfileSetupPage() {
 
     try {
       await api.patch('/auth/profile', { nativeLanguage, targetAccent });
+      markProfileComplete();
       navigate('/dashboard');
     } catch {
       setError('Failed to save profile. Please try again.');
@@ -56,7 +59,7 @@ export default function ProfileSetupPage() {
           </div>
           <h1 className="text-2xl font-bold text-gray-900">One last step</h1>
           <p className="text-gray-500 text-sm mt-1 text-center max-w-sm">
-            Tell us a bit about yourself so we can personalise your experience
+            Tell us about yourself so we can personalise your coaching experience
           </p>
         </div>
 
@@ -78,7 +81,8 @@ export default function ProfileSetupPage() {
             </Alert>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-6">
+            {/* Native language */}
             <Select
               label="Your native language"
               options={LANGUAGES}
@@ -87,10 +91,14 @@ export default function ProfileSetupPage() {
               required
             />
 
+            {/* Target accent */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Target accent
               </label>
+              <p className="text-xs text-gray-400 mb-3">
+                Choose the English accent you want to practise towards
+              </p>
               <div className="grid grid-cols-2 gap-3">
                 {ACCENTS.map((a) => (
                   <button
@@ -99,16 +107,13 @@ export default function ProfileSetupPage() {
                     onClick={() => setTargetAccent(a.value)}
                     className={`p-4 rounded-xl border-2 text-left transition-all duration-150 ${
                       targetAccent === a.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 bg-white hover:border-gray-300'
+                        ? 'border-blue-500 bg-blue-50 shadow-sm'
+                        : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
                     }`}
                   >
-                    <p className="text-sm font-medium text-gray-900">
-                      {a.flag} {a.value}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {a.label}
-                    </p>
+                    <span className="text-2xl leading-none">{a.flag}</span>
+                    <p className="text-sm font-semibold text-gray-900 mt-2">{a.label}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">{a.sub}</p>
                   </button>
                 ))}
               </div>
@@ -128,7 +133,7 @@ export default function ProfileSetupPage() {
 
           <button
             type="button"
-            onClick={() => navigate('/dashboard')}
+            onClick={() => { markProfileComplete(); navigate('/dashboard'); }}
             className="w-full text-center text-sm text-gray-400 hover:text-gray-600 mt-4 transition-colors"
           >
             Skip for now

@@ -1,22 +1,22 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { RequireAuth, RedirectIfAuthed } from './components/layout/Guards';
+import { RequireAuth, RedirectIfAuthed, RequireProfile } from './components/layout/Guards';
 import { AppLayout } from './components/layout/AppLayout';
 
-import LandingPage      from './pages/LandingPage';
-import LoginPage        from './pages/LoginPage';
-import ProfileSetupPage from './pages/ProfileSetupPage';
-import DashboardPage    from './pages/DashboardPage';
-import ExercisesPage    from './pages/ExercisesPage';
-import SessionPage      from './pages/SessionPage';
+import LandingPage        from './pages/LandingPage';
+import LoginPage          from './pages/LoginPage';
+import ProfileSetupPage   from './pages/ProfileSetupPage';
+import DashboardPage      from './pages/DashboardPage';
+import ExercisesPage      from './pages/ExercisesPage';
+import SessionPage        from './pages/SessionPage';
 import SessionSummaryPage from './pages/SessionSummaryPage';
-import AnalyticsPage    from './pages/AnalyticsPage';
-import SubscriptionPage from './pages/SubscriptionPage';
+import AnalyticsPage      from './pages/AnalyticsPage';
+import SubscriptionPage   from './pages/SubscriptionPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Landing page — public, always accessible */}
+        {/* Landing page — public */}
         <Route path="/" element={<LandingPage />} />
 
         {/* Auth pages */}
@@ -37,12 +37,14 @@ export default function App() {
           }
         />
 
-        {/* Full-screen session routes (no sidebar) */}
+        {/* Full-screen session routes (no sidebar) — require auth + profile */}
         <Route
           path="/session/:sessionPublicId"
           element={
             <RequireAuth>
-              <SessionPage />
+              <RequireProfile>
+                <SessionPage />
+              </RequireProfile>
             </RequireAuth>
           }
         />
@@ -50,16 +52,20 @@ export default function App() {
           path="/sessions/:publicId"
           element={
             <RequireAuth>
-              <SessionSummaryPage />
+              <RequireProfile>
+                <SessionSummaryPage />
+              </RequireProfile>
             </RequireAuth>
           }
         />
 
-        {/* App shell with sidebar */}
+        {/* App shell with sidebar — require auth + profile */}
         <Route
           element={
             <RequireAuth>
-              <AppLayout />
+              <RequireProfile>
+                <AppLayout />
+              </RequireProfile>
             </RequireAuth>
           }
         >

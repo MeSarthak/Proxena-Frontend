@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
-import { Mic, Square, ArrowLeft, AlertCircle, Clock } from 'lucide-react';
+import { Mic, Square, ArrowLeft, AlertCircle, Clock, Volume2, VolumeX } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
-import { exercisesApi } from '../lib/api';
+import { useSpeechDemo } from '../hooks/useSpeechDemo';
+import { exercisesApi, authApi } from '../lib/api';
 import type { ExerciseDetail } from '../types';
 import { Waveform } from '../components/ui/Waveform';
 import { Alert } from '../components/ui/Alert';
@@ -94,22 +95,30 @@ export default function SessionPage() {
   const [exercise, setExercise] = useState<ExerciseDetail | null>(null);
   const [loadingExercise, setLoadingExercise] = useState(true);
   const [displayWords, setDisplayWords] = useState<DisplayWord[]>([]);
+  const [targetAccent, setTargetAccent] = useState<string>('en-US');
   const maxSeconds = locationState?.maxDurationSeconds ?? 120;
 
   const { phase, liveWords, summary, errorMessage, startSession, stopSession } = useSession();
+  const { speak, stop, speaking, supported: ttsSupported } = useSpeechDemo();
 
-  // Load exercise text
+  // Load exercise text + user's target accent
   useEffect(() => {
     if (!exercisePublicId) return;
     exercisesApi
       .get(exercisePublicId)
       .then((ex) => {
         setExercise(ex);
-        // Tokenise the text into display words
         const words = ex.textContent.trim().split(/\s+/);
         setDisplayWords(words.map((w) => ({ word: w, status: 'pending' as WordStatus })));
       })
       .finally(() => setLoadingExercise(false));
+
+    // Fetch profile for target accent (best-effort — fall back to en-US)
+    authApi.me()
+      .then((profile) => {
+        if (profile.targetAccent) setTargetAccent(profile.targetAccent);
+      })
+      .catch(() => {});
   }, [exercisePublicId]);
 
   // Sync live word results → display words
@@ -118,7 +127,6 @@ export default function SessionPage() {
     setDisplayWords((prev) => {
       const updated = [...prev];
       liveWords.forEach((lw) => {
-        // Match by word text (stripped of punctuation for comparison)
         const clean = (w: string) => w.toLowerCase().replace(/[^a-z]/g, '');
         const idx = updated.findIndex(
           (dw) => dw.status === 'pending' && clean(dw.word) === clean(lw.word),
@@ -141,18 +149,39 @@ export default function SessionPage() {
   const handleStart = () => {
     const wsUrl = locationState?.wsUrl;
     if (!wsUrl) {
-      // wsUrl missing — navigate back to exercises so a fresh session can be started
       navigate('/exercises');
       return;
     }
-    // Reset word display
+    // Stop any demo speech before recording
+    stop();
     setDisplayWords((prev) => prev.map((w) => ({ ...w, status: 'pending' })));
     startSession(wsUrl);
   };
 
-  const isRecording = phase === 'recording';
+  const handleDemo = () => {
+    if (!exercise) return;
+    if (speaking) {
+      stop();
+    } else {
+      speak(exercise.textContent, targetAccent);
+    }
+  };
+
+  const isIdle       = phase === 'idle';
+  const isRecording  = phase === 'recording';
   const isProcessing = phase === 'processing';
   const isConnecting = phase === 'connecting';
+
+  // Accent display label
+  const ACCENT_LABELS: Record<string, string> = {
+    'en-US': 'American',
+    'en-GB': 'British',
+    'en-AU': 'Australian',
+    'en-IN': 'Indian',
+    'en-CA': 'Canadian',
+    'en-IE': 'Irish',
+  };
+  const accentLabel = ACCENT_LABELS[targetAccent] ?? targetAccent;
 
   if (loadingExercise) {
     return (
@@ -221,11 +250,39 @@ export default function SessionPage() {
           <div className="card p-8 mb-8">
             {/* Header */}
             {exercise && (
-              <div className="mb-6 pb-5 border-b border-gray-100">
-                <h2 className="text-base font-semibold text-gray-900">{exercise.title}</h2>
-                <p className="text-xs text-gray-400 mt-1">
-                  Read the text below clearly and at a natural pace
-                </p>
+              <div className="mb-6 pb-5 border-b border-gray-100 flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-base font-semibold text-gray-900">{exercise.title}</h2>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Read the text below clearly and at a natural pace
+                  </p>
+                </div>
+
+                {/* Demo speech button — only when idle/error and TTS supported */}
+                {ttsSupported && (isIdle || phase === 'error') && (
+                  <button
+                    onClick={handleDemo}
+                    title={speaking ? 'Stop demo' : `Hear ${accentLabel} accent demo`}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium shrink-0 transition-all duration-150',
+                      speaking
+                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200',
+                    )}
+                  >
+                    {speaking ? (
+                      <>
+                        <VolumeX className="w-3.5 h-3.5" />
+                        Stop demo
+                      </>
+                    ) : (
+                      <>
+                        <Volume2 className="w-3.5 h-3.5" />
+                        Hear {accentLabel} demo
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
 
@@ -261,7 +318,7 @@ export default function SessionPage() {
             <Waveform active={isRecording} />
 
             {/* Mic / stop button */}
-            {phase === 'idle' || phase === 'error' ? (
+            {isIdle || phase === 'error' ? (
               <button
                 onClick={handleStart}
                 disabled={!exercise || phase === 'error'}
@@ -292,15 +349,15 @@ export default function SessionPage() {
 
             {/* Status label */}
             <p className="text-sm text-gray-500 text-center">
-              {phase === 'idle'      && 'Tap the microphone to start speaking'}
-              {phase === 'connecting'&& 'Connecting to AI coach...'}
-              {phase === 'recording' && 'Listening — speak clearly and at a natural pace'}
-              {phase === 'processing'&& 'Analysing your pronunciation...'}
-              {phase === 'error'     && 'Something went wrong'}
+              {isIdle       && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start speaking')}
+              {isConnecting && 'Connecting to AI coach...'}
+              {isRecording  && 'Listening — speak clearly and at a natural pace'}
+              {isProcessing && 'Analysing your pronunciation...'}
+              {phase === 'error' && 'Something went wrong'}
             </p>
 
             {/* Mic permission note */}
-            {phase === 'idle' && (
+            {isIdle && !speaking && (
               <p className="text-xs text-gray-400 text-center max-w-sm">
                 Your browser will ask for microphone permission. Audio is processed securely and never stored.
               </p>
