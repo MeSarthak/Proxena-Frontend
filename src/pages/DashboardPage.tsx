@@ -171,7 +171,7 @@ export default function DashboardPage() {
 
       {/* Quick start CTA */}
       <Card className="mb-6 bg-gradient-to-r from-blue-600 to-blue-700 border-0">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h2 className="text-lg font-bold text-white">Ready to practise?</h2>
             <p className="text-blue-100 text-sm mt-0.5">
@@ -183,7 +183,7 @@ export default function DashboardPage() {
             variant="secondary"
             size="lg"
             disabled={limitReached}
-            className="shrink-0 ml-4"
+            className="shrink-0 sm:ml-4 w-full sm:w-auto"
           >
             <Play className="w-4 h-4" />
             Start practising
@@ -226,17 +226,17 @@ export default function DashboardPage() {
                     <Calendar className="w-4 h-4 text-gray-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900">{formatDate(s.createdAt)}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">{formatDate(s.createdAt)}</p>
                     <p className="text-xs text-gray-500">{formatDuration(s.durationSeconds)}</p>
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">
                       <p className={`text-sm font-semibold ${scoreColor(s.overallAccuracy)}`}>
                         {formatPercent(s.overallAccuracy, 0)}
                       </p>
                       <p className="text-xs text-gray-400">accuracy</p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right hidden sm:block">
                       <p className={`text-sm font-semibold ${scoreColor(s.fluencyScore)}`}>
                         {formatPercent(s.fluencyScore, 0)}
                       </p>

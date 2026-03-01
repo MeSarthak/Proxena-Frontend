@@ -254,16 +254,27 @@ const TESTIMONIALS = [
 // ─── Navbar ───────────────────────────────────────────────────────────────────
 function Navbar() {
   const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   useEffect(() => {
     const fn = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', fn);
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
+  const navLinks = [
+    { href: '#features', label: 'Features' },
+    { href: '#how-it-works', label: 'How it works' },
+    { href: '#testimonials', label: 'Testimonials' },
+    { href: '#pricing', label: 'Pricing' },
+  ];
+
   return (
     <nav
       className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white/90 backdrop-blur-md shadow-sm border-b border-gray-100' : 'bg-transparent'
+        scrolled || menuOpen
+          ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-gray-100'
+          : 'bg-transparent'
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -273,15 +284,14 @@ function Navbar() {
           <span className="font-bold text-gray-900 text-lg tracking-tight">Proxena</span>
         </div>
 
-        {/* Links */}
+        {/* Desktop links */}
         <div className="hidden md:flex items-center gap-7 text-sm text-gray-600">
-          <a href="#features" className="hover:text-gray-900 transition-colors">Features</a>
-          <a href="#how-it-works" className="hover:text-gray-900 transition-colors">How it works</a>
-          <a href="#testimonials" className="hover:text-gray-900 transition-colors">Testimonials</a>
-          <a href="#pricing" className="hover:text-gray-900 transition-colors">Pricing</a>
+          {navLinks.map(({ href, label }) => (
+            <a key={href} href={href} className="hover:text-gray-900 transition-colors">{label}</a>
+          ))}
         </div>
 
-        {/* CTA */}
+        {/* Desktop CTA + mobile hamburger */}
         <div className="flex items-center gap-3">
           <Link
             to="/login"
@@ -291,12 +301,63 @@ function Navbar() {
           </Link>
           <Link
             to="/login"
-            className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-medium transition-colors"
+            className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-medium transition-colors hidden sm:block"
           >
             Get started free
           </Link>
+          {/* Hamburger — mobile only */}
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="md:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
+            aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={menuOpen}
+          >
+            {menuOpen ? (
+              // X icon
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            ) : (
+              // Hamburger icon
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            )}
+          </button>
         </div>
       </div>
+
+      {/* Mobile dropdown menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white/95 backdrop-blur-md px-6 py-4 flex flex-col gap-1">
+          {navLinks.map(({ href, label }) => (
+            <a
+              key={href}
+              href={href}
+              onClick={() => setMenuOpen(false)}
+              className="py-2.5 text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+            >
+              {label}
+            </a>
+          ))}
+          <div className="mt-3 pt-3 border-t border-gray-100 flex flex-col gap-2">
+            <Link
+              to="/login"
+              onClick={() => setMenuOpen(false)}
+              className="py-2.5 text-sm text-gray-700 hover:text-gray-900 font-medium transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
+              to="/login"
+              onClick={() => setMenuOpen(false)}
+              className="w-full text-center text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-medium transition-colors"
+            >
+              Get started free
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 }

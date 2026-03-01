@@ -202,7 +202,7 @@ export default function SessionSummaryPage() {
                   className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
                 >
                   <WordStatusIcon errorType={w.errorType} />
-                  <span className="font-medium text-gray-900 min-w-24">{w.word}</span>
+                  <span className="font-medium text-gray-900 w-20 sm:w-24 truncate">{w.word}</span>
                   <span className="text-xs text-gray-400 flex-1">{errorLabel(w.errorType)}</span>
                   <span className={`text-sm font-semibold tabular-nums ${scoreColor(w.accuracy)}`}>
                     {formatPercent(w.accuracy, 0)}
