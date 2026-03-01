@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useState,
+  useCallback,
   type ReactNode,
 } from 'react';
 import {
@@ -14,10 +15,15 @@ import {
   signOut,
 } from 'firebase/auth';
 import { auth, googleProvider } from '../lib/firebase';
+import { api } from '../lib/api';
+import type { UserProfile } from '../types';
 
 interface AuthContextValue {
   user: User | null;
   loading: boolean;
+  /** null = still loading; true = profile complete; false = needs /setup */
+  profileComplete: boolean | null;
+  markProfileComplete: () => void;
   signUp: (email: string, password: string) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signInWithGoogle: () => Promise<void>;
@@ -30,13 +36,38 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileComplete, setProfileComplete] = useState<boolean | null>(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+
+      if (!currentUser) {
+        // Logged out — reset profile state
+        setProfileComplete(null);
+        return;
+      }
+
+      // Fetch profile to check if native language + accent are set
+      api
+        .get<UserProfile>('/auth/me')
+        .then((r) => {
+          const p = r.data;
+          setProfileComplete(
+            Boolean(p.nativeLanguage && p.targetAccent),
+          );
+        })
+        .catch(() => {
+          // If fetch fails, don't block the user — treat as complete
+          setProfileComplete(true);
+        });
     });
     return unsubscribe;
+  }, []);
+
+  const markProfileComplete = useCallback(() => {
+    setProfileComplete(true);
   }, []);
 
   const signUp = async (email: string, password: string) => {
@@ -62,7 +93,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, signUp, signIn, signInWithGoogle, logOut, getIdToken }}
+      value={{
+        user,
+        loading,
+        profileComplete,
+        markProfileComplete,
+        signUp,
+        signIn,
+        signInWithGoogle,
+        logOut,
+        getIdToken,
+      }}
     >
       {children}
     </AuthContext.Provider>

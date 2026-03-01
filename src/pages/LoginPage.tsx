@@ -39,10 +39,11 @@ export default function LoginPage() {
     try {
       if (mode === 'login') {
         await signIn(email, password);
+        navigate('/dashboard');
       } else {
         await signUp(email, password);
+        navigate('/setup');
       }
-      navigate('/dashboard');
     } catch (err: unknown) {
       const code = (err as { code?: string }).code ?? '';
       setError(getErrorMessage(code));
