@@ -42,6 +42,7 @@ export interface SessionSummary {
   fluencyScore: number | null;
   durationSeconds: number | null;
   createdAt: string;
+  exerciseTitle?: string;
 }
 
 export interface WordResult {
@@ -58,6 +59,7 @@ export interface SessionDetail {
   durationSeconds: number | null;
   createdAt: string;
   words: WordResult[];
+  exercisePublicId?: string;
 }
 
 export interface StartSessionResponse {

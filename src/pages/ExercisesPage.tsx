@@ -54,6 +54,7 @@ export default function ExercisesPage() {
   const [category, setCategory] = useState<Category | ''>('');
   const [difficulty, setDifficulty] = useState<Difficulty | ''>('');
   const [targetAccent, setTargetAccent] = useState<string>('en-US');
+  const [limitReached, setLimitReached] = useState(false);
   // Per-card demo loading & playing state
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
   const [demoPlaying, setDemoPlaying] = useState<string | null>(null);
@@ -74,10 +75,16 @@ export default function ExercisesPage() {
       .finally(() => setLoading(false));
   }, [category, difficulty]);
 
-  // Fetch user's target accent once
+  // Fetch user's target accent and usage limit once
   useEffect(() => {
     authApi.me()
-      .then((p) => { if (p.targetAccent) setTargetAccent(p.targetAccent); })
+      .then((p) => {
+        if (p.targetAccent) setTargetAccent(p.targetAccent);
+        const u = p.usageToday;
+        if (u && (u.minutesUsed >= u.dailyLimit || u.sessionsCount >= u.dailySessionLimit)) {
+          setLimitReached(true);
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -106,6 +113,7 @@ export default function ExercisesPage() {
         ?.response?.data?.error?.code;
       if (code === 'DAILY_LIMIT_EXCEEDED') {
         setError("You've reached today's practice limit. Upgrade to Pro for unlimited sessions.");
+        setLimitReached(true);
       } else {
         setError('Failed to start session. Please try again.');
       }
@@ -160,6 +168,19 @@ export default function ExercisesPage() {
       {error && (
         <Alert variant="error" className="mb-6" onClose={() => setError(null)}>
           {error}
+        </Alert>
+      )}
+
+      {limitReached && !error && (
+        <Alert variant="warning" className="mb-6">
+          You've reached today's practice limit.{' '}
+          <button
+            onClick={() => navigate('/subscription')}
+            className="font-medium underline hover:no-underline"
+          >
+            Upgrade to Pro
+          </button>{' '}
+          for unlimited sessions.
         </Alert>
       )}
 
@@ -269,10 +290,11 @@ export default function ExercisesPage() {
                 size="sm"
                 className="w-full"
                 loading={starting === ex.publicId}
+                disabled={limitReached}
                 onClick={() => handleStart(ex.publicId)}
               >
                 <Play className="w-3.5 h-3.5" />
-                Start practice
+                {limitReached ? 'Limit reached' : 'Start practice'}
               </Button>
             </div>
           ))}

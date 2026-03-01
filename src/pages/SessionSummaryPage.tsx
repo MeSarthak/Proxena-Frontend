@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, LayoutDashboard, CheckCircle, AlertCircle, MinusCircle } from 'lucide-react';
+import { ArrowLeft, RefreshCw, LayoutDashboard, CheckCircle, AlertCircle, MinusCircle, Repeat2 } from 'lucide-react';
 import { sessionsApi } from '../lib/api';
 import type { SessionDetail, WsSummaryMessage } from '../types';
 import { Card } from '../components/ui/Card';
@@ -90,6 +90,7 @@ export default function SessionSummaryPage() {
 
   const [session, setSession] = useState<SessionDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [restarting, setRestarting] = useState(false);
 
   // The speaking page may pass summary inline via state to avoid extra fetch
   const inlineSummary = (location.state as { summary?: WsSummaryMessage } | null)?.summary;
@@ -101,6 +102,19 @@ export default function SessionSummaryPage() {
       .then(setSession)
       .finally(() => setLoading(false));
   }, [publicId]);
+
+  const handlePractiseSame = async () => {
+    if (!session?.exercisePublicId) return;
+    setRestarting(true);
+    try {
+      const { sessionPublicId, wsUrl, maxDurationSeconds } = await sessionsApi.start(session.exercisePublicId);
+      navigate(`/session/${sessionPublicId}?exercise=${session.exercisePublicId}`, {
+        state: { wsUrl, maxDurationSeconds },
+      });
+    } catch {
+      setRestarting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -215,12 +229,22 @@ export default function SessionSummaryPage() {
 
         {/* Actions */}
         <div className="flex gap-3 flex-wrap">
+          {session?.exercisePublicId && (
+            <Button
+              variant="primary"
+              loading={restarting}
+              onClick={handlePractiseSame}
+            >
+              <Repeat2 className="w-4 h-4" />
+              Practice same exercise
+            </Button>
+          )}
           <Button
-            variant="primary"
+            variant={session?.exercisePublicId ? 'secondary' : 'primary'}
             onClick={() => navigate('/exercises')}
           >
             <RefreshCw className="w-4 h-4" />
-            Practice again
+            {session?.exercisePublicId ? 'Try another exercise' : 'Practice again'}
           </Button>
           <Button
             variant="secondary"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Clock, Zap, TrendingUp, Calendar, ChevronRight } from 'lucide-react';
+import { Play, Clock, Zap, TrendingUp, Calendar, ChevronRight, Flame } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authApi, sessionsApi } from '../lib/api';
 import type { UserProfile, SessionSummary } from '../types';
@@ -59,6 +59,7 @@ export default function DashboardPage() {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [streak, setStreak] = useState<number>(0);
 
   const quote = QUOTES[new Date().getDay() % QUOTES.length];
 
@@ -72,13 +73,39 @@ export default function DashboardPage() {
       .then((r) => setSessions(r.sessions))
       .catch(() => {})
       .finally(() => setLoadingSessions(false));
+
+    // Fetch up to 100 sessions to compute streak accurately
+    sessionsApi.history(1, 100)
+      .then((r) => {
+        const days = new Set(
+          r.sessions.map((s) =>
+            new Date(s.createdAt).toLocaleDateString('en-CA'), // YYYY-MM-DD
+          ),
+        );
+        // Walk back from today counting consecutive days
+        let count = 0;
+        const cursor = new Date();
+        while (true) {
+          const key = cursor.toLocaleDateString('en-CA');
+          if (days.has(key)) {
+            count++;
+            cursor.setDate(cursor.getDate() - 1);
+          } else {
+            break;
+          }
+        }
+        setStreak(count);
+      })
+      .catch(() => {});
   }, []);
 
   const usage = profile?.usageToday;
   const minutesPct = usage ? Math.min(100, (usage.minutesUsed / usage.dailyLimit) * 100) : 0;
   const limitReached = usage ? usage.minutesUsed >= usage.dailyLimit || usage.sessionsCount >= usage.dailySessionLimit : false;
 
-  const firstName = user?.email?.split('@')[0] ?? 'there';
+  // Prefer Firebase displayName (set for Google OAuth users), fall back to email prefix
+  const rawName = user?.displayName ?? user?.email?.split('@')[0] ?? 'there';
+  const firstName = rawName.charAt(0).toUpperCase() + rawName.slice(1);
 
   return (
     <div className="max-w-5xl mx-auto fade-in">
@@ -104,9 +131,9 @@ export default function DashboardPage() {
       )}
 
       {/* Stats row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {loadingProfile ? (
-          Array.from({ length: 3 }).map((_, i) => (
+          Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="card p-6 h-24 skeleton" />
           ))
         ) : (
@@ -133,6 +160,13 @@ export default function DashboardPage() {
               sub="last session"
               icon={TrendingUp}
               color="yellow"
+            />
+            <StatCard
+              label="Day streak"
+              value={streak > 0 ? String(streak) : '—'}
+              sub={streak === 1 ? 'day in a row' : streak > 1 ? 'days in a row' : 'No streak yet'}
+              icon={Flame}
+              color="blue"
             />
           </>
         )}
@@ -226,8 +260,12 @@ export default function DashboardPage() {
                     <Calendar className="w-4 h-4 text-gray-400" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 truncate">{formatDate(s.createdAt)}</p>
-                    <p className="text-xs text-gray-500">{formatDuration(s.durationSeconds)}</p>
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {s.exerciseTitle ?? formatDate(s.createdAt)}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {s.exerciseTitle ? formatDate(s.createdAt) + ' · ' : ''}{formatDuration(s.durationSeconds)}
+                    </p>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <div className="text-right">

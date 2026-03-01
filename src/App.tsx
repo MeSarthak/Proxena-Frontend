@@ -11,6 +11,7 @@ import SessionPage        from './pages/SessionPage';
 import SessionSummaryPage from './pages/SessionSummaryPage';
 import AnalyticsPage      from './pages/AnalyticsPage';
 import SubscriptionPage   from './pages/SubscriptionPage';
+import SettingsPage       from './pages/SettingsPage';
 
 export default function App() {
   return (
@@ -73,6 +74,7 @@ export default function App() {
           <Route path="/exercises"    element={<ExercisesPage />} />
           <Route path="/analytics"    element={<AnalyticsPage />} />
           <Route path="/subscription" element={<SubscriptionPage />} />
+          <Route path="/settings"     element={<SettingsPage />} />
         </Route>
 
         {/* Fallback */}

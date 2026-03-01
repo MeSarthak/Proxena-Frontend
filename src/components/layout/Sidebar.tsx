@@ -6,15 +6,17 @@ import {
   CreditCard,
   LogOut,
   Mic2,
+  Settings,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
 const nav = [
-  { to: '/dashboard',    label: 'Dashboard',   icon: LayoutDashboard },
-  { to: '/exercises',    label: 'Exercises',   icon: BookOpen },
-  { to: '/analytics',   label: 'Analytics',   icon: BarChart2 },
+  { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
+  { to: '/exercises',    label: 'Exercises',    icon: BookOpen },
+  { to: '/analytics',   label: 'Analytics',    icon: BarChart2 },
   { to: '/subscription', label: 'Subscription', icon: CreditCard },
+  { to: '/settings',    label: 'Settings',     icon: Settings },
 ];
 
 interface SidebarProps {

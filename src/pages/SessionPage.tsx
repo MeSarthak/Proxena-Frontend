@@ -156,6 +156,21 @@ export default function SessionPage() {
     }
   }, [phase, summary, sessionPublicId, navigate]);
 
+  // Space bar shortcut: start or stop recording
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON') return;
+      e.preventDefault();
+      if (phase === 'idle') handleStart();
+      else if (phase === 'recording') stopSession();
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
+
   const handleStart = () => {
     const wsUrl = locationState?.wsUrl;
     if (!wsUrl) {
@@ -324,6 +339,13 @@ export default function SessionPage() {
 
           {/* Controls */}
           <div className="flex flex-col items-center gap-4">
+            {/* Word count progress — shown while recording */}
+            {isRecording && displayWords.length > 0 && (
+              <p className="text-xs text-gray-400 tabular-nums">
+                {displayWords.filter((w) => w.status !== 'pending').length} / {displayWords.length} words
+              </p>
+            )}
+
             {/* Waveform */}
             <Waveform active={isRecording} />
 
@@ -359,7 +381,7 @@ export default function SessionPage() {
 
             {/* Status label */}
             <p className="text-sm text-gray-500 text-center">
-              {isIdle       && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start speaking')}
+              {isIdle       && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start — or press Space')}
               {isConnecting && 'Connecting to AI coach...'}
               {isRecording  && 'Listening — speak clearly and at a natural pace'}
               {isProcessing && 'Analysing your pronunciation...'}

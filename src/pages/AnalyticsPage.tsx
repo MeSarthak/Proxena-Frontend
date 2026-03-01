@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { sessionsApi } from '../lib/api';
 import type { SessionSummary } from '../types';
 import { Card } from '../components/ui/Card';
@@ -29,6 +30,7 @@ function EmptyChart() {
 }
 
 export default function AnalyticsPage() {
+  const navigate = useNavigate();
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -100,9 +102,9 @@ export default function AnalyticsPage() {
         </Card>
       </div>
 
-      {/* Accuracy over time */}
+      {/* Combined accuracy + fluency trend */}
       <Card className="mb-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Accuracy over time</h2>
+        <h2 className="font-semibold text-gray-900 mb-4">Progress over time</h2>
         {loading ? (
           <div className="h-52 skeleton" />
         ) : chartData.length < 2 ? (
@@ -141,43 +143,6 @@ export default function AnalyticsPage() {
                 dot={{ r: 3 }}
                 activeDot={{ r: 5 }}
               />
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </Card>
-
-      {/* Fluency trend */}
-      <Card className="mb-6">
-        <h2 className="font-semibold text-gray-900 mb-4">Fluency trend</h2>
-        {loading ? (
-          <div className="h-52 skeleton" />
-        ) : chartData.length < 2 ? (
-          <EmptyChart />
-        ) : (
-          <ResponsiveContainer width="100%" height={220}>
-            <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-              <XAxis
-                dataKey="date"
-                tick={{ fontSize: 11, fill: '#9ca3af' }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <YAxis
-                domain={[0, 100]}
-                tick={{ fontSize: 11, fill: '#9ca3af' }}
-                tickLine={false}
-                axisLine={false}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  fontSize: 12,
-                }}
-              />
-              <Legend wrapperStyle={{ fontSize: 12 }} />
               <Line
                 type="monotone"
                 dataKey="fluency"
@@ -239,8 +204,17 @@ export default function AnalyticsPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {sessions.map((s) => (
-                    <tr key={s.publicId} className="hover:bg-gray-50 transition-colors">
-                      <td className="py-2.5 text-gray-700">{formatDate(s.createdAt)}</td>
+                    <tr
+                      key={s.publicId}
+                      onClick={() => navigate(`/sessions/${s.publicId}`)}
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                    >
+                      <td className="py-2.5 text-gray-700">
+                        <div className="font-medium">{formatDate(s.createdAt)}</div>
+                        {s.exerciseTitle && (
+                          <div className="text-xs text-gray-400 truncate max-w-[180px]">{s.exerciseTitle}</div>
+                        )}
+                      </td>
                       <td className={`py-2.5 text-right font-semibold tabular-nums ${scoreColor(s.overallAccuracy)}`}>
                         {formatPercent(s.overallAccuracy, 0)}
                       </td>
