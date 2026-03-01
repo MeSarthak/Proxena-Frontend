@@ -14,6 +14,7 @@ export interface UserProfile {
     minutesUsed: number;
     sessionsCount: number;
     dailyLimit: number;
+    dailySessionLimit: number;
   };
 }
 

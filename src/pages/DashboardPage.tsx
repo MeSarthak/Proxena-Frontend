@@ -76,7 +76,7 @@ export default function DashboardPage() {
 
   const usage = profile?.usageToday;
   const minutesPct = usage ? Math.min(100, (usage.minutesUsed / usage.dailyLimit) * 100) : 0;
-  const limitReached = usage ? usage.minutesUsed >= usage.dailyLimit || usage.sessionsCount >= 3 : false;
+  const limitReached = usage ? usage.minutesUsed >= usage.dailyLimit || usage.sessionsCount >= usage.dailySessionLimit : false;
 
   const firstName = user?.email?.split('@')[0] ?? 'there';
 
@@ -121,7 +121,7 @@ export default function DashboardPage() {
             <StatCard
               label="Sessions today"
               value={String(usage?.sessionsCount ?? 0)}
-              sub={`of ${profile?.subscription.planType === 'pro' ? '∞' : '3'} sessions`}
+              sub={`of ${profile?.subscription.planType === 'pro' ? '∞' : String(usage?.dailySessionLimit ?? 3)} sessions`}
               icon={Zap}
               color="green"
             />
