@@ -221,6 +221,8 @@ export default function SessionSummaryPage() {
   const fillerCount      = session?.fillerCount ?? inlineSummary?.fillerCount ?? 0;
   const wordsPerMinute   = session?.wordsPerMinute ?? inlineSummary?.wordsPerMinute ?? null;
   const speechHealth     = session?.speechHealthScore ?? inlineSummary?.speechHealthScore ?? null;
+  const completeness     = session?.completenessScore ?? inlineSummary?.completenessScore ?? null;
+  const prosody          = session?.prosodyScore ?? inlineSummary?.prosodyScore ?? null;
   const fillerWords      = inlineSummary?.fillerWords ?? [];
 
   const feedback = accuracy != null ? motivationalFeedback(accuracy) : null;
@@ -281,7 +283,7 @@ export default function SessionSummaryPage() {
           <h2 className="font-semibold text-gray-900 mb-1">Speech Intelligence</h2>
           <p className="text-xs text-gray-500 mb-4">Deep analytics from your session</p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
             {/* Speech Health Score */}
             <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50">
               <div className="relative w-20 h-20">
@@ -313,6 +315,38 @@ export default function SessionSummaryPage() {
               <span className={`text-xs font-medium ${speechHealthColor(speechHealth)}`}>
                 {speechHealthLabel(speechHealth)}
               </span>
+            </div>
+
+            {/* Completeness */}
+            <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-gray-50">
+              <span className={`text-3xl font-bold ${scoreColor(completeness)}`}>
+                {completeness != null ? completeness.toFixed(0) : '—'}
+              </span>
+              <span className="text-xs font-medium text-gray-700">Completeness</span>
+              <span className={`text-xs font-medium ${
+                completeness != null && completeness >= 80 ? 'text-green-600' :
+                completeness != null && completeness >= 50 ? 'text-yellow-600' :
+                completeness != null ? 'text-red-600' : 'text-gray-400'
+              }`}>
+                {completeness == null ? 'N/A' : completeness >= 80 ? 'Thorough' : completeness >= 50 ? 'Partial' : 'Incomplete'}
+              </span>
+              <span className="text-xs text-gray-400 mt-1">Words covered</span>
+            </div>
+
+            {/* Prosody */}
+            <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-gray-50">
+              <span className={`text-3xl font-bold ${scoreColor(prosody)}`}>
+                {prosody != null ? prosody.toFixed(0) : '—'}
+              </span>
+              <span className="text-xs font-medium text-gray-700">Prosody</span>
+              <span className={`text-xs font-medium ${
+                prosody != null && prosody >= 80 ? 'text-green-600' :
+                prosody != null && prosody >= 50 ? 'text-yellow-600' :
+                prosody != null ? 'text-red-600' : 'text-gray-400'
+              }`}>
+                {prosody == null ? 'N/A' : prosody >= 80 ? 'Natural' : prosody >= 50 ? 'Developing' : 'Monotone'}
+              </span>
+              <span className="text-xs text-gray-400 mt-1">Rhythm & intonation</span>
             </div>
 
             {/* Speaking Speed */}
@@ -357,7 +391,7 @@ export default function SessionSummaryPage() {
           {/* Health score breakdown legend */}
           <div className="mt-4 pt-3 border-t border-gray-100">
             <p className="text-xs text-gray-400">
-              Health score = 40% Accuracy + 30% Fluency + 20% Speed + 10% Filler control
+              Health score = 30% Accuracy + 20% Fluency + 15% Completeness + 15% Prosody + 10% Speed + 10% Filler control
             </p>
           </div>
         </Card>

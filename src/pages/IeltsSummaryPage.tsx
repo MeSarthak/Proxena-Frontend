@@ -19,7 +19,8 @@ import {
 } from '../lib/utils';
 
 // ─── Rule-based IELTS band score estimation ───────────────────────────────────
-// Weighted composite: 40% accuracy + 30% fluency + 20% speed score + 10% filler score
+// Weighted composite: 30% accuracy + 20% fluency + 15% completeness + 15% prosody
+//   + 10% speed score + 10% filler score
 // Then map composite → band using IELTS-style thresholds.
 //
 // Speed score: 100 if 110-160 WPM, linear decay outside.
@@ -47,15 +48,19 @@ function computeFillerScore(fillerCount: number, durationSeconds: number | null)
 function computeComposite(
   accuracy: number | null,
   fluency: number | null,
+  completeness: number | null,
+  prosody: number | null,
   wpm: number | null,
   fillerCount: number,
   durationSeconds: number | null,
 ): number {
   const a = accuracy ?? 0;
   const f = fluency ?? 0;
+  const c = completeness ?? 0;
+  const p = prosody ?? 0;
   const s = computeSpeedScore(wpm);
   const fc = computeFillerScore(fillerCount, durationSeconds);
-  return a * 0.4 + f * 0.3 + s * 0.2 + fc * 0.1;
+  return a * 0.30 + f * 0.20 + c * 0.15 + p * 0.15 + s * 0.10 + fc * 0.10;
 }
 
 function compositeToBand(composite: number): number {
@@ -194,6 +199,8 @@ export default function IeltsSummaryPage() {
 
   const accuracy       = session?.overallAccuracy ?? inlineSummary?.overallAccuracy ?? null;
   const fluency        = session?.fluencyScore ?? inlineSummary?.fluencyScore ?? null;
+  const completeness   = session?.completenessScore ?? inlineSummary?.completenessScore ?? null;
+  const prosody        = session?.prosodyScore ?? inlineSummary?.prosodyScore ?? null;
   const duration       = session?.durationSeconds ?? inlineSummary?.durationSeconds ?? null;
   const wpm            = session?.wordsPerMinute ?? inlineSummary?.wordsPerMinute ?? null;
   const fillerCount    = session?.fillerCount ?? inlineSummary?.fillerCount ?? 0;
@@ -204,7 +211,7 @@ export default function IeltsSummaryPage() {
   // Compute scores
   const speedScore  = computeSpeedScore(wpm);
   const fillerScore = computeFillerScore(fillerCount, duration);
-  const composite   = computeComposite(accuracy, fluency, wpm, fillerCount, duration);
+  const composite   = computeComposite(accuracy, fluency, completeness, prosody, wpm, fillerCount, duration);
   const band        = compositeToBand(composite);
 
   const problematic = words.filter(
@@ -258,19 +265,31 @@ export default function IeltsSummaryPage() {
           <div className="divide-y divide-gray-50">
             <CriterionRow
               label="Pronunciation Accuracy"
-              weight="40%"
+              weight="30%"
               rawScore={accuracy ?? 0}
               color={scoreColor(accuracy)}
             />
             <CriterionRow
               label="Fluency & Coherence"
-              weight="30%"
+              weight="20%"
               rawScore={fluency ?? 0}
               color={scoreColor(fluency)}
             />
             <CriterionRow
+              label="Completeness"
+              weight="15%"
+              rawScore={completeness ?? 0}
+              color={scoreColor(completeness)}
+            />
+            <CriterionRow
+              label="Prosody (Rhythm & Intonation)"
+              weight="15%"
+              rawScore={prosody ?? 0}
+              color={scoreColor(prosody)}
+            />
+            <CriterionRow
               label="Speaking Speed"
-              weight="20%"
+              weight="10%"
               rawScore={speedScore}
               color={wpmColor(wpm)}
             />

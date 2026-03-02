@@ -63,6 +63,8 @@ export interface SessionSummary {
   publicId: string;
   overallAccuracy: number | null;
   fluencyScore: number | null;
+  completenessScore: number | null;
+  prosodyScore: number | null;
   durationSeconds: number | null;
   fillerCount: number;
   wordsPerMinute: number | null;
@@ -82,6 +84,8 @@ export interface SessionDetail {
   status: 'pending' | 'completed' | 'failed';
   overallAccuracy: number | null;
   fluencyScore: number | null;
+  completenessScore: number | null;
+  prosodyScore: number | null;
   durationSeconds: number | null;
   fillerCount: number;
   wordsPerMinute: number | null;
@@ -149,6 +153,8 @@ export interface WsSummaryMessage {
   type: 'summary';
   overallAccuracy: number;
   fluencyScore: number;
+  completenessScore: number;
+  prosodyScore: number;
   durationSeconds: number;
   fillerCount: number;
   wordsPerMinute: number;

@@ -19,6 +19,8 @@ interface ChartPoint {
   date: string;
   accuracy: number | null;
   fluency: number | null;
+  completeness: number | null;
+  prosody: number | null;
   healthScore: number | null;
   wpm: number | null;
   fillers: number;
@@ -58,6 +60,8 @@ export default function AnalyticsPage() {
       date: new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       accuracy: s.overallAccuracy,
       fluency: s.fluencyScore,
+      completeness: s.completenessScore,
+      prosody: s.prosodyScore,
       healthScore: s.speechHealthScore,
       wpm: s.wordsPerMinute,
       fillers: s.fillerCount,
@@ -185,6 +189,24 @@ export default function AnalyticsPage() {
                 dataKey="fluency"
                 name="Fluency"
                 stroke="#22c55e"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="completeness"
+                name="Completeness"
+                stroke="#8b5cf6"
+                strokeWidth={2}
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+              />
+              <Line
+                type="monotone"
+                dataKey="prosody"
+                name="Prosody"
+                stroke="#ec4899"
                 strokeWidth={2}
                 dot={{ r: 3 }}
                 activeDot={{ r: 5 }}
