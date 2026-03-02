@@ -65,10 +65,19 @@ export interface SessionSummary {
   fluencyScore: number | null;
   completenessScore: number | null;
   prosodyScore: number | null;
+  pronunciationScore: number | null;
   durationSeconds: number | null;
   fillerCount: number;
   wordsPerMinute: number | null;
   speechHealthScore: number | null;
+  pauseCount: number;
+  totalPauseMs: number;
+  avgPauseMs: number;
+  longestPauseMs: number;
+  hesitationScore: number | null;
+  mispronunciationCount: number;
+  omissionCount: number;
+  insertionCount: number;
   createdAt: string;
   exerciseTitle?: string;
 }
@@ -77,6 +86,9 @@ export interface WordResult {
   word: string;
   accuracy: number | null;
   errorType: string | null;
+  phonemes: { phoneme: string; accuracy: number }[] | null;
+  syllables: { syllable: string; accuracy: number; durationMs: number }[] | null;
+  durationMs: number | null;
 }
 
 export interface SessionDetail {
@@ -86,10 +98,19 @@ export interface SessionDetail {
   fluencyScore: number | null;
   completenessScore: number | null;
   prosodyScore: number | null;
+  pronunciationScore: number | null;
   durationSeconds: number | null;
   fillerCount: number;
   wordsPerMinute: number | null;
   speechHealthScore: number | null;
+  pauseCount: number;
+  totalPauseMs: number;
+  avgPauseMs: number;
+  longestPauseMs: number;
+  hesitationScore: number | null;
+  mispronunciationCount: number;
+  omissionCount: number;
+  insertionCount: number;
   createdAt: string;
   words: WordResult[];
   exercisePublicId?: string;
@@ -155,11 +176,20 @@ export interface WsSummaryMessage {
   fluencyScore: number;
   completenessScore: number;
   prosodyScore: number;
+  pronunciationScore: number;
   durationSeconds: number;
   fillerCount: number;
   wordsPerMinute: number;
   speechHealthScore: number;
   fillerWords: string[];
+  pauseCount: number;
+  totalPauseMs: number;
+  avgPauseMs: number;
+  longestPauseMs: number;
+  hesitationScore: number;
+  mispronunciationCount: number;
+  omissionCount: number;
+  insertionCount: number;
 }
 
 export interface WsErrorMessage {

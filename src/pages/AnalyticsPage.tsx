@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { sessionsApi } from '../lib/api';
 import type { SessionSummary } from '../types';
 import { Card } from '../components/ui/Card';
-import { formatDate, formatPercent, scoreColor, speechHealthColor, wpmColor, fillerColor } from '../lib/utils';
+import { formatDate, formatPercent, scoreColor, speechHealthColor, wpmColor, fillerColor, hesitationColor } from '../lib/utils';
 import {
   LineChart,
   Line,
@@ -22,6 +22,7 @@ interface ChartPoint {
   completeness: number | null;
   prosody: number | null;
   healthScore: number | null;
+  hesitation: number | null;
   wpm: number | null;
   fillers: number;
 }
@@ -63,6 +64,7 @@ export default function AnalyticsPage() {
       completeness: s.completenessScore,
       prosody: s.prosodyScore,
       healthScore: s.speechHealthScore,
+      hesitation: s.hesitationScore,
       wpm: s.wordsPerMinute,
       fillers: s.fillerCount,
     }));
@@ -81,6 +83,12 @@ export default function AnalyticsPage() {
   const avgHealthScore =
     sessions.length > 0
       ? sessions.reduce((acc, s) => acc + (s.speechHealthScore ?? 0), 0) / sessions.length
+      : null;
+
+  const avgHesitation =
+    sessions.filter((s) => s.hesitationScore != null).length > 0
+      ? sessions.reduce((acc, s) => acc + (s.hesitationScore ?? 0), 0) /
+        sessions.filter((s) => s.hesitationScore != null).length
       : null;
 
   const avgWpm =
@@ -106,7 +114,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
         <Card className="text-center">
           <p className="text-3xl font-bold text-gray-900">{total}</p>
           <p className="text-sm text-gray-500 mt-1">Total sessions</p>
@@ -128,6 +136,12 @@ export default function AnalyticsPage() {
             {avgHealthScore != null ? avgHealthScore.toFixed(0) : '—'}
           </p>
           <p className="text-sm text-gray-500 mt-1">Avg. health</p>
+        </Card>
+        <Card className="text-center">
+          <p className={`text-3xl font-bold ${hesitationColor(avgHesitation)}`}>
+            {avgHesitation != null ? avgHesitation.toFixed(0) : '—'}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Avg. hesitation</p>
         </Card>
         <Card className="text-center">
           <p className={`text-3xl font-bold ${wpmColor(avgWpm)}`}>
@@ -216,8 +230,8 @@ export default function AnalyticsPage() {
         )}
       </Card>
 
-      {/* Speech Health + WPM trend */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {/* Speech Health + Hesitation + WPM trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
         <Card>
           <h2 className="font-semibold text-gray-900 mb-4">Speech Health Score</h2>
           {loading ? (
@@ -238,6 +252,26 @@ export default function AnalyticsPage() {
         </Card>
 
         <Card>
+          <h2 className="font-semibold text-gray-900 mb-4">Hesitation Score</h2>
+          {loading ? (
+            <div className="h-44 skeleton" />
+          ) : chartData.length < 2 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, fontSize: 12 }} />
+                <Line type="monotone" dataKey="hesitation" name="Hesitation" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <p className="text-xs text-gray-400 mt-2">Higher = smoother speech (fewer pauses)</p>
+        </Card>
+
+        <Card>
           <h2 className="font-semibold text-gray-900 mb-4">Speaking Speed (WPM)</h2>
           {loading ? (
             <div className="h-44 skeleton" />
@@ -255,7 +289,7 @@ export default function AnalyticsPage() {
               </LineChart>
             </ResponsiveContainer>
           )}
-          <p className="text-xs text-gray-400 mt-2">Ideal range: 110–160 WPM</p>
+          <p className="text-xs text-gray-400 mt-2">Ideal range: 110-160 WPM</p>
         </Card>
       </div>
 

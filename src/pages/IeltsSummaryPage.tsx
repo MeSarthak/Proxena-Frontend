@@ -16,20 +16,23 @@ import {
   wpmLabel,
   fillerColor,
   fillerLabel,
+  hesitationColor,
+  hesitationLabel,
 } from '../lib/utils';
 
 // ─── Rule-based IELTS band score estimation ───────────────────────────────────
-// Weighted composite: 30% accuracy + 20% fluency + 15% completeness + 15% prosody
-//   + 10% speed score + 10% filler score
-// Then map composite → band using IELTS-style thresholds.
+// Weighted composite: 25% accuracy + 18% fluency + 12% completeness + 12% prosody
+//   + 12% hesitation + 11% speed score + 10% filler score
+// Then map composite -> band using IELTS-style thresholds.
 //
 // Speed score: 100 if 110-160 WPM, linear decay outside.
 // Filler score: max(0, 100 - fillersPerMinute * 20)
+// Hesitation score: passed from backend (0-100, higher = smoother speech)
 //
-// Composite → Band mapping:
-//   95+ → 9.0, 90+ → 8.5, 85+ → 8.0, 80+ → 7.5, 75+ → 7.0,
-//   70+ → 6.5, 65+ → 6.0, 58+ → 5.5, 50+ → 5.0, 42+ → 4.5,
-//   35+ → 4.0, else 3.5
+// Composite -> Band mapping:
+//   95+ -> 9.0, 90+ -> 8.5, 85+ -> 8.0, 80+ -> 7.5, 75+ -> 7.0,
+//   70+ -> 6.5, 65+ -> 6.0, 58+ -> 5.5, 50+ -> 5.0, 42+ -> 4.5,
+//   35+ -> 4.0, else 3.5
 
 function computeSpeedScore(wpm: number | null): number {
   if (wpm == null) return 50;
@@ -50,6 +53,7 @@ function computeComposite(
   fluency: number | null,
   completeness: number | null,
   prosody: number | null,
+  hesitation: number | null,
   wpm: number | null,
   fillerCount: number,
   durationSeconds: number | null,
@@ -58,9 +62,10 @@ function computeComposite(
   const f = fluency ?? 0;
   const c = completeness ?? 0;
   const p = prosody ?? 0;
+  const h = hesitation ?? 50; // default to mid if not available
   const s = computeSpeedScore(wpm);
   const fc = computeFillerScore(fillerCount, durationSeconds);
-  return a * 0.30 + f * 0.20 + c * 0.15 + p * 0.15 + s * 0.10 + fc * 0.10;
+  return a * 0.25 + f * 0.18 + c * 0.12 + p * 0.12 + h * 0.12 + s * 0.11 + fc * 0.10;
 }
 
 function compositeToBand(composite: number): number {
@@ -205,13 +210,14 @@ export default function IeltsSummaryPage() {
   const wpm            = session?.wordsPerMinute ?? inlineSummary?.wordsPerMinute ?? null;
   const fillerCount    = session?.fillerCount ?? inlineSummary?.fillerCount ?? 0;
   const speechHealth   = session?.speechHealthScore ?? inlineSummary?.speechHealthScore ?? null;
+  const hesitation     = session?.hesitationScore ?? inlineSummary?.hesitationScore ?? null;
   const fillerWords    = inlineSummary?.fillerWords ?? [];
   const words          = session?.words ?? [];
 
   // Compute scores
   const speedScore  = computeSpeedScore(wpm);
   const fillerScore = computeFillerScore(fillerCount, duration);
-  const composite   = computeComposite(accuracy, fluency, completeness, prosody, wpm, fillerCount, duration);
+  const composite   = computeComposite(accuracy, fluency, completeness, prosody, hesitation, wpm, fillerCount, duration);
   const band        = compositeToBand(composite);
 
   const problematic = words.filter(
@@ -265,31 +271,37 @@ export default function IeltsSummaryPage() {
           <div className="divide-y divide-gray-50">
             <CriterionRow
               label="Pronunciation Accuracy"
-              weight="30%"
+              weight="25%"
               rawScore={accuracy ?? 0}
               color={scoreColor(accuracy)}
             />
             <CriterionRow
               label="Fluency & Coherence"
-              weight="20%"
+              weight="18%"
               rawScore={fluency ?? 0}
               color={scoreColor(fluency)}
             />
             <CriterionRow
               label="Completeness"
-              weight="15%"
+              weight="12%"
               rawScore={completeness ?? 0}
               color={scoreColor(completeness)}
             />
             <CriterionRow
               label="Prosody (Rhythm & Intonation)"
-              weight="15%"
+              weight="12%"
               rawScore={prosody ?? 0}
               color={scoreColor(prosody)}
             />
             <CriterionRow
+              label="Hesitation Control"
+              weight="12%"
+              rawScore={hesitation ?? 0}
+              color={hesitationColor(hesitation)}
+            />
+            <CriterionRow
               label="Speaking Speed"
-              weight="10%"
+              weight="11%"
               rawScore={speedScore}
               color={wpmColor(wpm)}
             />
@@ -304,6 +316,7 @@ export default function IeltsSummaryPage() {
           <div className="mt-4 pt-3 border-t border-gray-100 flex flex-wrap gap-4 text-xs text-gray-400">
             <span>WPM: {wpm != null ? `${wpm.toFixed(0)} (${wpmLabel(wpm)})` : '—'}</span>
             <span>Fillers: {fillerCount} ({fillerLabel(fillerCount)})</span>
+            <span>Hesitation: {hesitation != null ? `${hesitation.toFixed(0)} (${hesitationLabel(hesitation)})` : '—'}</span>
             <span>Health Score: {speechHealth != null ? `${speechHealth.toFixed(0)} (${speechHealthLabel(speechHealth)})` : '—'}</span>
           </div>
         </Card>

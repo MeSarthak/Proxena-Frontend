@@ -154,11 +154,14 @@ export default function SessionPage() {
   const [chunkKey, setChunkKey] = useState(0);                // bumped to trigger crossfade animation
   const guideRef = useRef<number | null>(null);               // interval handle
   const scoreGenCounter = useRef(0);                          // monotonic counter for pop animation keys
+  const matchCursor = useRef(0);                              // sequential cursor for word matching
+  const prevLiveWordCount = useRef(0);                        // track last-processed liveWords length
+  const lastScoreTime = useRef(0);                            // timestamp of last word scored (for fallback auto-stop)
 
   // Shadowing mode state
   const [shadowPhase, setShadowPhase] = useState<'listening' | 'ready'>('listening');
 
-  const { phase, liveWords, summary, errorMessage, startSession, stopSession } = useSession();
+  const { phase, liveWords, summary, errorMessage, silenceWarning, startSession, stopSession } = useSession();
   const { speak, stop, speaking, supported: ttsSupported } = useSpeechDemo();
 
   // Compute chunks from displayWords
@@ -207,25 +210,86 @@ export default function SessionPage() {
   }, [speaking, isShadowMode, shadowPhase, exercise]);
 
   // ── Sync live word results → display words ────────────────────────────────
+  // Uses a sequential cursor so duplicate words and slight text mismatches
+  // (punctuation, casing) are handled correctly by respecting word order.
   useEffect(() => {
     if (liveWords.length === 0) return;
+    // Only process newly-added liveWords (avoid reprocessing on every render)
+    const newCount = liveWords.length;
+    const startIdx = prevLiveWordCount.current;
+    if (newCount <= startIdx) return;
+    prevLiveWordCount.current = newCount;
+
+    const newWords = liveWords.slice(startIdx);
+
     setDisplayWords((prev) => {
       const updated = [...prev];
-      liveWords.forEach((lw) => {
-        const clean = (w: string) => w.toLowerCase().replace(/[^a-z]/g, '');
-        const idx = updated.findIndex(
-          (dw) => dw.status === 'pending' && clean(dw.word) === clean(lw.word),
-        );
-        if (idx !== -1) {
-          scoreGenCounter.current += 1;
-          updated[idx] = {
-            word: updated[idx].word,
-            status: lw.status,
-            accuracy: lw.accuracy,
-            scoreGen: scoreGenCounter.current,
-          };
+      const clean = (w: string) => w.toLowerCase().replace(/[^a-z]/g, '');
+      let cursor = matchCursor.current;
+
+      for (const lw of newWords) {
+        const lwClean = clean(lw.word);
+
+        // Skip insertion words (extra words not in reference text)
+        if (lw.status === 'incorrect' && lwClean === '') continue;
+
+        // Search forward from cursor to find the next matching pending word.
+        // First try exact match, then try a fuzzy prefix/contains match.
+        let matchIdx = -1;
+
+        // Exact match pass — search forward from cursor
+        for (let i = cursor; i < updated.length; i++) {
+          if (updated[i].status === 'pending' && clean(updated[i].word) === lwClean) {
+            matchIdx = i;
+            break;
+          }
         }
-      });
+
+        // If no exact match, try fuzzy: Azure sometimes strips trailing punctuation,
+        // or the reference has "don't" while Azure sends "dont", etc.
+        if (matchIdx === -1) {
+          for (let i = cursor; i < updated.length; i++) {
+            if (updated[i].status !== 'pending') continue;
+            const dwClean = clean(updated[i].word);
+            // Match if one contains the other (handles "don't" vs "dont", or "world." vs "world")
+            if (dwClean.startsWith(lwClean) || lwClean.startsWith(dwClean)) {
+              matchIdx = i;
+              break;
+            }
+          }
+        }
+
+        // If still no match, it might be an insertion word from Azure — skip it
+        if (matchIdx === -1) continue;
+
+        scoreGenCounter.current += 1;
+        updated[matchIdx] = {
+          word: updated[matchIdx].word,
+          status: lw.status,
+          accuracy: lw.accuracy,
+          scoreGen: scoreGenCounter.current,
+        };
+
+        // Advance cursor past the matched word.
+        // Also skip any words before it that are still pending — mark them as skipped
+        // if Azure has moved past them (they were likely omitted).
+        for (let i = cursor; i < matchIdx; i++) {
+          if (updated[i].status === 'pending') {
+            scoreGenCounter.current += 1;
+            updated[i] = {
+              word: updated[i].word,
+              status: 'skipped',
+              accuracy: 0,
+              scoreGen: scoreGenCounter.current,
+            };
+          }
+        }
+
+        cursor = matchIdx + 1;
+      }
+
+      matchCursor.current = cursor;
+      if (newWords.length > 0) lastScoreTime.current = Date.now();
       return updated;
     });
   }, [liveWords]);
@@ -306,13 +370,43 @@ export default function SessionPage() {
     }
   }, [displayWords, phase, currentChunkIndex, totalChunks, chunks]);
 
-  // ── Auto-stop when every word has been scored ─────────────────────────────
+  // ── Auto-stop when every word has been scored (or fallback threshold) ───
+  // Primary: all words scored → stop immediately.
+  // Fallback: ≥90% scored AND no new words for 3s → stop (handles omissions at end).
   useEffect(() => {
     if (phase !== 'recording') return;
     if (displayWords.length === 0) return;
-    const allScored = displayWords.every((dw) => dw.status !== 'pending');
-    if (allScored) {
+
+    const scored = displayWords.filter((dw) => dw.status !== 'pending').length;
+    const total = displayWords.length;
+
+    // Primary: all scored
+    if (scored === total) {
       stopSession();
+      return;
+    }
+
+    // Fallback: ≥90% scored — wait 3s for any stragglers then stop
+    if (scored / total >= 0.9 && scored > 0) {
+      const timer = setTimeout(() => {
+        // Re-check: if still recording and no new words scored in the interval
+        const nowScored = displayWords.filter((dw) => dw.status !== 'pending').length;
+        if (nowScored === scored) {
+          // Mark remaining pending words as skipped before stopping
+          setDisplayWords((prev) => {
+            const updated = [...prev];
+            for (let i = 0; i < updated.length; i++) {
+              if (updated[i].status === 'pending') {
+                scoreGenCounter.current += 1;
+                updated[i] = { word: updated[i].word, status: 'skipped', accuracy: 0, scoreGen: scoreGenCounter.current };
+              }
+            }
+            return updated;
+          });
+          stopSession();
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
     }
   }, [displayWords, phase, stopSession]);
 
@@ -355,6 +449,8 @@ export default function SessionPage() {
     }
     stop(); // stop any demo speech
     setDisplayWords((prev) => prev.map((w) => ({ ...w, status: 'pending' as WordStatus, scoreGen: undefined })));
+    matchCursor.current = 0;          // reset sequential word matcher
+    prevLiveWordCount.current = 0;    // reset live word tracker
     startGuide();
     startSession(wsUrl);
   };
@@ -659,7 +755,12 @@ export default function SessionPage() {
               {isIdle && isShadowMode && shadowPhase === 'ready'    && 'Now try to shadow it — tap the microphone when ready'}
               {isIdle && !isShadowMode && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start — or press Space')}
               {isConnecting && 'Connecting to AI coach...'}
-              {isRecording  && 'Listening — follow the blue guide and speak clearly'}
+              {isRecording && !silenceWarning && 'Listening — follow the blue guide and speak clearly'}
+              {isRecording && silenceWarning && (
+                <span className="text-amber-600 font-medium animate-pulse">
+                  No speech detected — session will auto-stop soon
+                </span>
+              )}
               {isProcessing && 'Analysing your pronunciation...'}
               {phase === 'error' && 'Something went wrong'}
             </p>

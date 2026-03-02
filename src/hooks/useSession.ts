@@ -21,24 +21,43 @@ export interface UseSessionReturn {
   liveWords: LiveWord[];
   summary: WsSummaryMessage | null;
   errorMessage: string | null;
+  silenceWarning: boolean;
   startSession: (wsUrl: string) => void;
   stopSession: () => void;
 }
 
 const SAMPLE_RATE = 16_000;
 
+// ─── Silence detection thresholds ──────────────────────────────────────────
+// RMS below this is considered silence (after noiseSuppression, ambient ~0.001-0.005)
+const SILENCE_RMS_THRESHOLD = 0.01;
+// Show "are you still speaking?" warning after this many seconds of silence
+const SILENCE_WARNING_MS = 5_000;
+// Auto-stop the session after this many seconds of continuous silence
+const SILENCE_AUTO_STOP_MS = 10_000;
+
 export function useSession(): UseSessionReturn {
   const [phase, setPhase] = useState<SessionPhase>('idle');
   const [liveWords, setLiveWords] = useState<LiveWord[]>([]);
   const [summary, setSummary] = useState<WsSummaryMessage | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [silenceWarning, setSilenceWarning] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const workletNodeRef = useRef<AudioWorkletNode | null>(null);
 
+  // Silence detection refs
+  const lastSpeechTimeRef = useRef(0);
+  const silenceTimerRef = useRef<number | null>(null);
+
   const cleanup = useCallback(() => {
+    if (silenceTimerRef.current) {
+      clearInterval(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+    setSilenceWarning(false);
     if (workletNodeRef.current) {
       workletNodeRef.current.disconnect();
       workletNodeRef.current = null;
@@ -62,11 +81,16 @@ export function useSession(): UseSessionReturn {
     cleanup();
   }, [cleanup]);
 
+  // We need a ref to stopSession so the silence timer can call it without re-creating the interval
+  const stopSessionRef = useRef(stopSession);
+  stopSessionRef.current = stopSession;
+
   const startSession = useCallback(
     async (wsUrl: string) => {
       setLiveWords([]);
       setSummary(null);
       setErrorMessage(null);
+      setSilenceWarning(false);
       setPhase('connecting');
 
       let fullWsUrl: string;
@@ -91,8 +115,10 @@ export function useSession(): UseSessionReturn {
 
         if (msg.type === 'word') {
           const word = msg as WsWordMessage;
+          // Any word from Azure means user is speaking — reset silence timer
+          lastSpeechTimeRef.current = Date.now();
+          setSilenceWarning(false);
           setLiveWords((prev) => {
-            // Always append — SessionPage matches by word text against pending display tokens
             return [...prev, { word: word.word, accuracy: word.accuracy, status: word.status }];
           });
         } else if (msg.type === 'summary') {
@@ -169,15 +195,39 @@ export function useSession(): UseSessionReturn {
         const workletNode = new AudioWorkletNode(ctx, 'pcm-processor');
         workletNodeRef.current = workletNode;
 
-        // Receive Int16 PCM buffers from the worklet and forward over WebSocket
-        workletNode.port.onmessage = (e: MessageEvent<ArrayBuffer>) => {
+        // Receive PCM buffers + RMS energy from the worklet and forward PCM over WebSocket.
+        // The RMS is used client-side for silence detection.
+        workletNode.port.onmessage = (e: MessageEvent<{ pcm: ArrayBuffer; rms: number }>) => {
+          const { pcm, rms } = e.data;
+
+          // Track speech activity based on audio energy
+          if (rms >= SILENCE_RMS_THRESHOLD) {
+            lastSpeechTimeRef.current = Date.now();
+            setSilenceWarning(false);
+          }
+
+          // Forward PCM to server
           if (wsRef.current?.readyState === WebSocket.OPEN) {
-            wsRef.current.send(e.data);
+            wsRef.current.send(pcm);
           }
         };
 
         source.connect(workletNode);
         // Do NOT connect workletNode to ctx.destination — we don't want speaker output
+
+        // ── Start silence detection timer ──────────────────────────────
+        lastSpeechTimeRef.current = Date.now();
+        silenceTimerRef.current = window.setInterval(() => {
+          const silenceDuration = Date.now() - lastSpeechTimeRef.current;
+
+          if (silenceDuration >= SILENCE_AUTO_STOP_MS) {
+            // Auto-stop after prolonged silence
+            stopSessionRef.current();
+          } else if (silenceDuration >= SILENCE_WARNING_MS) {
+            // Show warning after shorter silence
+            setSilenceWarning(true);
+          }
+        }, 500);
 
         setPhase('recording');
       };
@@ -193,5 +243,5 @@ export function useSession(): UseSessionReturn {
     };
   }, [cleanup]);
 
-  return { phase, liveWords, summary, errorMessage, startSession, stopSession };
+  return { phase, liveWords, summary, errorMessage, silenceWarning, startSession, stopSession };
 }

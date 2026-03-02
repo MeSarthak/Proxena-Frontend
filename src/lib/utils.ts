@@ -147,3 +147,27 @@ export function fillerColor(count: number): string {
   if (count <= 5) return 'text-yellow-600';
   return 'text-red-600';
 }
+
+// ─── Hesitation / pause helpers ───────────────────────────────────────────────
+
+export function hesitationColor(score: number | null | undefined): string {
+  if (score == null) return 'text-gray-400';
+  if (score >= 80) return 'text-emerald-600';
+  if (score >= 60) return 'text-blue-600';
+  if (score >= 40) return 'text-yellow-600';
+  return 'text-red-600';
+}
+
+export function hesitationLabel(score: number | null | undefined): string {
+  if (score == null) return 'No data';
+  if (score >= 80) return 'Smooth';
+  if (score >= 60) return 'Mostly fluent';
+  if (score >= 40) return 'Some hesitation';
+  return 'Very hesitant';
+}
+
+export function formatMs(ms: number | null | undefined): string {
+  if (ms == null || ms === 0) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  return `${(ms / 1000).toFixed(1)}s`;
+}

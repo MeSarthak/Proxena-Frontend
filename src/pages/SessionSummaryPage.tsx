@@ -16,6 +16,7 @@ import {
   formatPercent,
   formatDate,
   formatDuration,
+  formatMs,
   scoreColor,
   scoreBg,
   motivationalFeedback,
@@ -25,6 +26,8 @@ import {
   wpmLabel,
   fillerColor,
   fillerLabel,
+  hesitationColor,
+  hesitationLabel,
 } from '../lib/utils';
 import {
   RadialBarChart,
@@ -224,6 +227,9 @@ export default function SessionSummaryPage() {
   const completeness     = session?.completenessScore ?? inlineSummary?.completenessScore ?? null;
   const prosody          = session?.prosodyScore ?? inlineSummary?.prosodyScore ?? null;
   const fillerWords      = inlineSummary?.fillerWords ?? [];
+  const hesitation       = session?.hesitationScore ?? inlineSummary?.hesitationScore ?? null;
+  const pauseCount       = session?.pauseCount ?? inlineSummary?.pauseCount ?? 0;
+  const avgPauseMs       = session?.avgPauseMs ?? inlineSummary?.avgPauseMs ?? 0;
 
   const feedback = accuracy != null ? motivationalFeedback(accuracy) : null;
 
@@ -283,7 +289,7 @@ export default function SessionSummaryPage() {
           <h2 className="font-semibold text-gray-900 mb-1">Speech Intelligence</h2>
           <p className="text-xs text-gray-500 mb-4">Deep analytics from your session</p>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
             {/* Speech Health Score */}
             <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50">
               <div className="relative w-20 h-20">
@@ -349,6 +355,22 @@ export default function SessionSummaryPage() {
               <span className="text-xs text-gray-400 mt-1">Rhythm & intonation</span>
             </div>
 
+            {/* Hesitation */}
+            <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-gray-50">
+              <span className={`text-3xl font-bold ${hesitationColor(hesitation)}`}>
+                {hesitation != null ? hesitation.toFixed(0) : '—'}
+              </span>
+              <span className="text-xs font-medium text-gray-700">Hesitation</span>
+              <span className={`text-xs font-medium ${hesitationColor(hesitation)}`}>
+                {hesitationLabel(hesitation)}
+              </span>
+              <div className="text-xs text-gray-400 mt-1 text-center">
+                {pauseCount > 0
+                  ? `${pauseCount} pause${pauseCount !== 1 ? 's' : ''}, avg ${formatMs(avgPauseMs)}`
+                  : 'No pauses detected'}
+              </div>
+            </div>
+
             {/* Speaking Speed */}
             <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-gray-50">
               <span className={`text-3xl font-bold ${wpmColor(wordsPerMinute)}`}>
@@ -364,7 +386,7 @@ export default function SessionSummaryPage() {
               }`}>
                 {wpmLabel(wordsPerMinute)}
               </span>
-              <span className="text-xs text-gray-400 mt-1">Ideal: 110–160 WPM</span>
+              <span className="text-xs text-gray-400 mt-1">Ideal: 110-160 WPM</span>
             </div>
 
             {/* Filler Words */}
@@ -391,7 +413,7 @@ export default function SessionSummaryPage() {
           {/* Health score breakdown legend */}
           <div className="mt-4 pt-3 border-t border-gray-100">
             <p className="text-xs text-gray-400">
-              Health score = 30% Accuracy + 20% Fluency + 15% Completeness + 15% Prosody + 10% Speed + 10% Filler control
+              Health score = 25% Accuracy + 15% Fluency + 12% Completeness + 12% Prosody + 12% Hesitation + 10% Speed + 7% Filler control + 7% Error rate
             </p>
           </div>
         </Card>
@@ -432,16 +454,34 @@ export default function SessionSummaryPage() {
             <h2 className="font-semibold text-gray-900 mb-4">Word-by-word breakdown</h2>
             <div className="flex flex-col divide-y divide-gray-50">
               {words.map((w, i) => (
-                <div
-                  key={i}
-                  className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0"
-                >
-                  <WordStatusIcon errorType={w.errorType} />
-                  <span className="font-medium text-gray-900 w-20 sm:w-24 truncate">{w.word}</span>
-                  <span className="text-xs text-gray-400 flex-1">{errorLabel(w.errorType)}</span>
-                  <span className={`text-sm font-semibold tabular-nums ${scoreColor(w.accuracy)}`}>
-                    {formatPercent(w.accuracy, 0)}
-                  </span>
+                <div key={i} className="py-2.5 first:pt-0 last:pb-0">
+                  <div className="flex items-center gap-3">
+                    <WordStatusIcon errorType={w.errorType} />
+                    <span className="font-medium text-gray-900 w-20 sm:w-24 truncate">{w.word}</span>
+                    <span className="text-xs text-gray-400 flex-1">{errorLabel(w.errorType)}</span>
+                    <span className={`text-sm font-semibold tabular-nums ${scoreColor(w.accuracy)}`}>
+                      {formatPercent(w.accuracy, 0)}
+                    </span>
+                  </div>
+                  {/* Phoneme breakdown */}
+                  {w.phonemes && w.phonemes.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5 ml-7">
+                      {w.phonemes.map((ph, j) => (
+                        <span
+                          key={j}
+                          className={`px-1.5 py-0.5 text-xs rounded font-mono ${
+                            ph.accuracy >= 80
+                              ? 'bg-green-50 text-green-700'
+                              : ph.accuracy >= 50
+                              ? 'bg-yellow-50 text-yellow-700'
+                              : 'bg-red-50 text-red-700'
+                          }`}
+                        >
+                          /{ph.phoneme}/ {ph.accuracy.toFixed(0)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
