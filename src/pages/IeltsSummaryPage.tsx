@@ -11,18 +11,12 @@ import {
   formatDate,
   formatDuration,
   scoreColor,
-  speechHealthColor,
   speechHealthLabel,
   wpmColor,
   wpmLabel,
   fillerColor,
   fillerLabel,
 } from '../lib/utils';
-import {
-  RadialBarChart,
-  RadialBar,
-  ResponsiveContainer,
-} from 'recharts';
 
 // ─── Rule-based IELTS band score estimation ───────────────────────────────────
 // Weighted composite: 40% accuracy + 30% fluency + 20% speed score + 10% filler score

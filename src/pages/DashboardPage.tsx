@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Alert } from '../components/ui/Alert';
-import { formatPercent, formatDate, formatDuration, scoreColor, speechHealthColor } from '../lib/utils';
+import { formatPercent, formatDate, formatDuration, scoreColor } from '../lib/utils';
 import { WordRecommendations } from '../components/WordRecommendations';
 import { WordOfTheDay } from '../components/WordOfTheDay';
 
