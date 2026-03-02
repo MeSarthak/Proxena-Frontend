@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { Mic, Square, ArrowLeft, AlertCircle, Clock, Volume2, VolumeX, Repeat } from 'lucide-react';
 import { useSession } from '../hooks/useSession';
@@ -10,16 +10,39 @@ import { Alert } from '../components/ui/Alert';
 import { Button } from '../components/ui/Button';
 import { cn } from '../lib/utils';
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+const WORDS_PER_CHUNK = 18;       // ~3-4 visual lines at text-2xl/3xl
+const GUIDE_WPM = 130;            // karaoke guide speed
+const GUIDE_INTERVAL_MS = Math.round(60000 / GUIDE_WPM); // ~462ms per word
+const GUIDE_MAX_AHEAD = 8;        // pause guide if this many words ahead of last scored
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 type WordStatus = 'correct' | 'partial' | 'incorrect' | 'skipped' | 'pending';
 
 interface DisplayWord {
   word: string;
   status: WordStatus;
   accuracy?: number;
+  /** Monotonic counter incremented each time status changes from pending → scored.
+   *  Used to trigger the pop animation via a key change. */
+  scoreGen?: number;
 }
 
-function WordToken({ word, status }: { word: string; status: WordStatus }) {
-  const cls: Record<WordStatus, string> = {
+// ─── WordToken ────────────────────────────────────────────────────────────────
+function WordToken({
+  word,
+  status,
+  isGuide,
+  isBehind,
+  scoreGen,
+}: {
+  word: string;
+  status: WordStatus;
+  isGuide: boolean;
+  isBehind: boolean;
+  scoreGen?: number;
+}) {
+  const statusCls: Record<WordStatus, string> = {
     correct:   'word-correct',
     partial:   'word-partial',
     incorrect: 'word-incorrect',
@@ -33,9 +56,20 @@ function WordToken({ word, status }: { word: string; status: WordStatus }) {
     skipped:   'Skipped',
     pending:   '',
   };
+
+  const isScored = status !== 'pending';
+
   return (
     <span
-      className={cn('word-token text-2xl md:text-3xl leading-relaxed font-medium', cls[status])}
+      // key on scoreGen forces remount → triggers pop animation
+      key={scoreGen}
+      className={cn(
+        'word-token text-2xl md:text-3xl leading-relaxed font-medium',
+        statusCls[status],
+        isGuide && !isScored && 'word-guide',
+        isBehind && !isScored && 'word-behind',
+        isScored && scoreGen && 'word-scored-pop',
+      )}
       title={title[status]}
     >
       {word}
@@ -43,6 +77,7 @@ function WordToken({ word, status }: { word: string; status: WordStatus }) {
   );
 }
 
+// ─── CountdownTimer ───────────────────────────────────────────────────────────
 function CountdownTimer({
   running,
   maxSeconds,
@@ -84,6 +119,18 @@ function CountdownTimer({
   );
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Split an array into chunks of `size`. */
+function chunkArray<T>(arr: T[], size: number): T[][] {
+  const chunks: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    chunks.push(arr.slice(i, i + size));
+  }
+  return chunks;
+}
+
+// ─── SessionPage ──────────────────────────────────────────────────────────────
 export default function SessionPage() {
   const { sessionPublicId } = useParams<{ sessionPublicId: string }>();
   const [searchParams] = useSearchParams();
@@ -101,14 +148,30 @@ export default function SessionPage() {
   const [targetAccent, setTargetAccent] = useState<string>('en-US');
   const maxSeconds = locationState?.maxDurationSeconds ?? 1800;
 
+  // Karaoke state
+  const [guideIndex, setGuideIndex] = useState(0);           // global word index the guide cursor is on
+  const [currentChunkIndex, setCurrentChunkIndex] = useState(0);
+  const [chunkKey, setChunkKey] = useState(0);                // bumped to trigger crossfade animation
+  const guideRef = useRef<number | null>(null);               // interval handle
+  const scoreGenCounter = useRef(0);                          // monotonic counter for pop animation keys
+
   // Shadowing mode state
-  // 'listening' = playing TTS demo, 'ready' = TTS done, user can now record
   const [shadowPhase, setShadowPhase] = useState<'listening' | 'ready'>('listening');
 
   const { phase, liveWords, summary, errorMessage, startSession, stopSession } = useSession();
   const { speak, stop, speaking, supported: ttsSupported } = useSpeechDemo();
 
-  // Load exercise text + user's target accent
+  // Compute chunks from displayWords
+  const chunks = chunkArray(displayWords, WORDS_PER_CHUNK);
+  const totalChunks = chunks.length;
+  const currentChunk = chunks[currentChunkIndex] ?? [];
+  const chunkStartIndex = currentChunkIndex * WORDS_PER_CHUNK; // global index offset for current chunk
+
+  // Scored word count (for progress bar)
+  const scoredCount = displayWords.filter((w) => w.status !== 'pending').length;
+  const totalWords = displayWords.length;
+
+  // ── Load exercise text + user's target accent ─────────────────────────────
   useEffect(() => {
     if (!exercisePublicId) return;
     exercisesApi
@@ -120,7 +183,6 @@ export default function SessionPage() {
       })
       .finally(() => setLoadingExercise(false));
 
-    // Fetch profile for target accent (best-effort — fall back to en-US)
     authApi.me()
       .then((profile) => {
         if (profile.targetAccent) setTargetAccent(profile.targetAccent);
@@ -128,7 +190,7 @@ export default function SessionPage() {
       .catch(() => {});
   }, [exercisePublicId]);
 
-  // Shadowing mode: auto-play TTS when exercise loads
+  // ── Shadowing mode: auto-play TTS when exercise loads ─────────────────────
   useEffect(() => {
     if (!isShadowMode || !exercise || !ttsSupported) return;
     setShadowPhase('listening');
@@ -136,7 +198,7 @@ export default function SessionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercise, isShadowMode]);
 
-  // Shadowing mode: when TTS finishes, move to 'ready'
+  // ── Shadowing mode: when TTS finishes, move to 'ready' ───────────────────
   useEffect(() => {
     if (!isShadowMode) return;
     if (!speaking && shadowPhase === 'listening' && exercise) {
@@ -144,7 +206,7 @@ export default function SessionPage() {
     }
   }, [speaking, isShadowMode, shadowPhase, exercise]);
 
-  // Sync live word results → display words
+  // ── Sync live word results → display words ────────────────────────────────
   useEffect(() => {
     if (liveWords.length === 0) return;
     setDisplayWords((prev) => {
@@ -155,14 +217,96 @@ export default function SessionPage() {
           (dw) => dw.status === 'pending' && clean(dw.word) === clean(lw.word),
         );
         if (idx !== -1) {
-          updated[idx] = { word: updated[idx].word, status: lw.status, accuracy: lw.accuracy };
+          scoreGenCounter.current += 1;
+          updated[idx] = {
+            word: updated[idx].word,
+            status: lw.status,
+            accuracy: lw.accuracy,
+            scoreGen: scoreGenCounter.current,
+          };
         }
       });
       return updated;
     });
   }, [liveWords]);
 
-  // Auto-stop when every word has been scored (none left as 'pending')
+  // ── Karaoke guide interval ────────────────────────────────────────────────
+  // Runs during recording. Advances guideIndex at GUIDE_WPM pace.
+  // Pauses if guide gets too far ahead of the last scored word.
+  const startGuide = useCallback(() => {
+    setGuideIndex(0);
+    setCurrentChunkIndex(0);
+    setChunkKey(0);
+  }, []);
+
+  const stopGuide = useCallback(() => {
+    if (guideRef.current) {
+      clearInterval(guideRef.current);
+      guideRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'recording' && totalWords > 0) {
+      guideRef.current = window.setInterval(() => {
+        setDisplayWords((currentWords) => {
+          setGuideIndex((prevGuide) => {
+            // Find last scored word index
+            let lastScoredIdx = -1;
+            for (let i = currentWords.length - 1; i >= 0; i--) {
+              if (currentWords[i].status !== 'pending') {
+                lastScoredIdx = i;
+                break;
+              }
+            }
+
+            // If guide is too far ahead of last scored, pause
+            if (lastScoredIdx >= 0 && prevGuide - lastScoredIdx > GUIDE_MAX_AHEAD) {
+              return prevGuide; // don't advance
+            }
+
+            // If user is speaking faster than guide, snap guide forward
+            if (lastScoredIdx >= prevGuide) {
+              return Math.min(lastScoredIdx + 1, currentWords.length - 1);
+            }
+
+            // Normal advance
+            const next = prevGuide + 1;
+            if (next >= currentWords.length) return currentWords.length - 1;
+            return next;
+          });
+          return currentWords; // don't mutate displayWords here
+        });
+      }, GUIDE_INTERVAL_MS);
+    } else {
+      stopGuide();
+    }
+    return stopGuide;
+  }, [phase, totalWords, stopGuide]);
+
+  // ── Auto-advance chunk when guide passes into next chunk ──────────────────
+  useEffect(() => {
+    if (totalChunks <= 1) return;
+    const targetChunk = Math.floor(guideIndex / WORDS_PER_CHUNK);
+    if (targetChunk !== currentChunkIndex && targetChunk < totalChunks) {
+      setCurrentChunkIndex(targetChunk);
+      setChunkKey((k) => k + 1); // trigger crossfade
+    }
+  }, [guideIndex, currentChunkIndex, totalChunks]);
+
+  // Also auto-advance chunk when all words in current chunk are scored
+  useEffect(() => {
+    if (phase !== 'recording' || totalChunks <= 1) return;
+    const chunk = chunks[currentChunkIndex];
+    if (!chunk) return;
+    const allScored = chunk.every((w) => w.status !== 'pending');
+    if (allScored && currentChunkIndex < totalChunks - 1) {
+      setCurrentChunkIndex((c) => c + 1);
+      setChunkKey((k) => k + 1);
+    }
+  }, [displayWords, phase, currentChunkIndex, totalChunks, chunks]);
+
+  // ── Auto-stop when every word has been scored ─────────────────────────────
   useEffect(() => {
     if (phase !== 'recording') return;
     if (displayWords.length === 0) return;
@@ -172,7 +316,7 @@ export default function SessionPage() {
     }
   }, [displayWords, phase, stopSession]);
 
-  // Navigate to summary when done
+  // ── Navigate to summary when done ─────────────────────────────────────────
   useEffect(() => {
     if (phase === 'done' && summary && sessionPublicId) {
       if (isIeltsMode) {
@@ -187,7 +331,7 @@ export default function SessionPage() {
     }
   }, [phase, summary, sessionPublicId, navigate, isChallenge, isShadowMode, isIeltsMode]);
 
-  // Space bar shortcut: start or stop recording
+  // ── Space bar shortcut ────────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return;
@@ -202,15 +346,16 @@ export default function SessionPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 
+  // ── Handlers ──────────────────────────────────────────────────────────────
   const handleStart = () => {
     const wsUrl = locationState?.wsUrl;
     if (!wsUrl) {
       navigate('/exercises');
       return;
     }
-    // Stop any demo speech before recording
-    stop();
-    setDisplayWords((prev) => prev.map((w) => ({ ...w, status: 'pending' })));
+    stop(); // stop any demo speech
+    setDisplayWords((prev) => prev.map((w) => ({ ...w, status: 'pending' as WordStatus, scoreGen: undefined })));
+    startGuide();
     startSession(wsUrl);
   };
 
@@ -225,7 +370,6 @@ export default function SessionPage() {
     }
   };
 
-  // For shadowing: replay the demo
   const handleReplay = () => {
     if (!exercise) return;
     stop();
@@ -233,12 +377,12 @@ export default function SessionPage() {
     speak(exercise.textContent, targetAccent);
   };
 
+  // ── Derived state ─────────────────────────────────────────────────────────
   const isIdle       = phase === 'idle';
   const isRecording  = phase === 'recording';
   const isProcessing = phase === 'processing';
   const isConnecting = phase === 'connecting';
 
-  // Accent display label
   const ACCENT_LABELS: Record<string, string> = {
     'en-US': 'American',
     'en-GB': 'British',
@@ -249,6 +393,10 @@ export default function SessionPage() {
   };
   const accentLabel = ACCENT_LABELS[targetAccent] ?? targetAccent;
 
+  // Progress bar percentage
+  const progressPct = totalWords > 0 ? (scoredCount / totalWords) * 100 : 0;
+
+  // ── Loading state ─────────────────────────────────────────────────────────
   if (loadingExercise) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -260,6 +408,7 @@ export default function SessionPage() {
     );
   }
 
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       {/* Top bar */}
@@ -286,6 +435,16 @@ export default function SessionPage() {
           )}
         </div>
       </header>
+
+      {/* Progress bar — thin line under header, visible during/after recording */}
+      {(isRecording || isProcessing || phase === 'done') && totalWords > 0 && (
+        <div className="h-1 bg-gray-100">
+          <div
+            className="h-full bg-blue-500 transition-all duration-500 ease-out"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      )}
 
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-8">
@@ -332,7 +491,6 @@ export default function SessionPage() {
                 {/* Demo speech button / Shadowing controls */}
                 {ttsSupported && (isIdle || phase === 'error') && (
                   isShadowMode ? (
-                    // Shadowing mode: show listening indicator or replay button
                     <div className="flex items-center gap-2 shrink-0">
                       {shadowPhase === 'listening' ? (
                         <button
@@ -380,12 +538,52 @@ export default function SessionPage() {
               </div>
             )}
 
-            {/* Text with word highlighting */}
-            <div className="leading-loose text-center min-h-24 flex flex-wrap justify-center gap-x-2 gap-y-1">
-              {displayWords.map((dw, i) => (
-                <WordToken key={i} word={dw.word} status={dw.status} />
-              ))}
-            </div>
+            {/* ─── Word display (karaoke windowed view) ──────────────────── */}
+            {isRecording || isProcessing || phase === 'done' ? (
+              // During/after recording: show only the current chunk with karaoke guide
+              <div
+                key={chunkKey}
+                className="chunk-enter leading-loose text-center min-h-24 flex flex-wrap justify-center gap-x-2 gap-y-1"
+              >
+                {currentChunk.map((dw, i) => {
+                  const globalIdx = chunkStartIndex + i;
+                  const isGuide = globalIdx === guideIndex && isRecording;
+                  const isBehind = globalIdx < guideIndex && isRecording;
+                  return (
+                    <WordToken
+                      key={`${globalIdx}-${dw.scoreGen ?? 0}`}
+                      word={dw.word}
+                      status={dw.status}
+                      isGuide={isGuide}
+                      isBehind={isBehind}
+                      scoreGen={dw.scoreGen}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              // Before recording: show ALL words (so user can preview the full text)
+              <div className="leading-loose text-center min-h-24 flex flex-wrap justify-center gap-x-2 gap-y-1">
+                {displayWords.map((dw, i) => (
+                  <WordToken
+                    key={i}
+                    word={dw.word}
+                    status={dw.status}
+                    isGuide={false}
+                    isBehind={false}
+                  />
+                ))}
+              </div>
+            )}
+
+            {/* Chunk indicator — shown during recording when multiple chunks exist */}
+            {isRecording && totalChunks > 1 && (
+              <div className="mt-3 text-center">
+                <span className="text-xs text-gray-400 tabular-nums">
+                  Section {currentChunkIndex + 1} of {totalChunks}
+                </span>
+              </div>
+            )}
 
             {/* Legend */}
             {(isRecording || phase === 'done') && (
@@ -402,6 +600,11 @@ export default function SessionPage() {
                 <span className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded-full bg-gray-200 inline-block" /> Skipped
                 </span>
+                {isRecording && (
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-3 h-1 rounded bg-blue-500 inline-block" /> Guide
+                  </span>
+                )}
               </div>
             )}
           </div>
@@ -409,9 +612,9 @@ export default function SessionPage() {
           {/* Controls */}
           <div className="flex flex-col items-center gap-4">
             {/* Word count progress — shown while recording */}
-            {isRecording && displayWords.length > 0 && (
+            {isRecording && totalWords > 0 && (
               <p className="text-xs text-gray-400 tabular-nums">
-                {displayWords.filter((w) => w.status !== 'pending').length} / {displayWords.length} words
+                {scoredCount} / {totalWords} words
               </p>
             )}
 
@@ -456,7 +659,7 @@ export default function SessionPage() {
               {isIdle && isShadowMode && shadowPhase === 'ready'    && 'Now try to shadow it — tap the microphone when ready'}
               {isIdle && !isShadowMode && (speaking ? `Listening to ${accentLabel} accent demo...` : 'Tap the microphone to start — or press Space')}
               {isConnecting && 'Connecting to AI coach...'}
-              {isRecording  && 'Listening — speak clearly and at a natural pace'}
+              {isRecording  && 'Listening — follow the blue guide and speak clearly'}
               {isProcessing && 'Analysing your pronunciation...'}
               {phase === 'error' && 'Something went wrong'}
             </p>

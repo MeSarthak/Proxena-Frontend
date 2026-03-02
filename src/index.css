@@ -64,6 +64,36 @@
   .word-skipped   { @apply bg-gray-100 text-gray-400 line-through; }
   .word-pending   { @apply text-gray-800; }
 
+  /* Karaoke guide — current word to speak */
+  .word-guide {
+    @apply border-b-3 border-blue-500 text-blue-900 scale-110;
+    text-decoration: none;
+  }
+
+  /* Behind the guide — user hasn't spoken these yet */
+  .word-behind {
+    @apply opacity-35;
+  }
+
+  /* Pop animation when a word gets scored */
+  @keyframes scored-pop {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  .word-scored-pop {
+    animation: scored-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  }
+
+  /* Chunk crossfade */
+  @keyframes chunk-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .chunk-enter {
+    animation: chunk-fade-in 0.3s ease-out both;
+  }
+
   /* Mic pulse */
   @keyframes mic-pulse {
     0%   { box-shadow: 0 0 0 0 rgb(37 99 235 / 0.45); }
