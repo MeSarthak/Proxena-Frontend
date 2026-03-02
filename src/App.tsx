@@ -13,6 +13,9 @@ import AnalyticsPage      from './pages/AnalyticsPage';
 import SubscriptionPage   from './pages/SubscriptionPage';
 import SettingsPage       from './pages/SettingsPage';
 import ChallengePage      from './pages/ChallengePage';
+import DiagnosticPage     from './pages/DiagnosticPage';
+import IeltsPage          from './pages/IeltsPage';
+import IeltsSummaryPage   from './pages/IeltsSummaryPage';
 
 export default function App() {
   return (
@@ -60,6 +63,16 @@ export default function App() {
             </RequireAuth>
           }
         />
+        <Route
+          path="/ielts/summary/:publicId"
+          element={
+            <RequireAuth>
+              <RequireProfile>
+                <IeltsSummaryPage />
+              </RequireProfile>
+            </RequireAuth>
+          }
+        />
 
         {/* App shell with sidebar — require auth + profile */}
         <Route
@@ -74,6 +87,8 @@ export default function App() {
           <Route path="/dashboard"    element={<DashboardPage />} />
           <Route path="/exercises"    element={<ExercisesPage />} />
           <Route path="/challenges"   element={<ChallengePage />} />
+          <Route path="/diagnostic"   element={<DiagnosticPage />} />
+          <Route path="/ielts"        element={<IeltsPage />} />
           <Route path="/analytics"    element={<AnalyticsPage />} />
           <Route path="/subscription" element={<SubscriptionPage />} />
           <Route path="/settings"     element={<SettingsPage />} />

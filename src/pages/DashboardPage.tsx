@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, Zap, TrendingUp, Calendar, ChevronRight, Flame, Bell, X } from 'lucide-react';
+import { Play, Zap, TrendingUp, Calendar, ChevronRight, Flame, Bell, X, Heart, Stethoscope, GraduationCap } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { authApi, sessionsApi } from '../lib/api';
 import type { UserProfile, SessionSummary } from '../types';
@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { ProgressBar } from '../components/ui/ProgressBar';
 import { Alert } from '../components/ui/Alert';
-import { formatPercent, formatDate, formatDuration, scoreColor } from '../lib/utils';
+import { formatPercent, formatDate, formatDuration, scoreColor, speechHealthColor } from '../lib/utils';
 import { WordRecommendations } from '../components/WordRecommendations';
 import { WordOfTheDay } from '../components/WordOfTheDay';
 
@@ -205,6 +205,15 @@ export default function DashboardPage() {
               icon={Flame}
               color="blue"
             />
+            <StatCard
+              label="Speech health"
+              value={sessions[0]?.speechHealthScore != null
+                ? `${sessions[0].speechHealthScore.toFixed(0)}`
+                : '—'}
+              sub="last session"
+              icon={Heart}
+              color="green"
+            />
           </>
         )}
       </div>
@@ -261,6 +270,53 @@ export default function DashboardPage() {
           </Button>
         </div>
       </Card>
+
+      {/* Diagnostic + IELTS CTAs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+        <Card className="bg-gradient-to-r from-emerald-50 to-teal-50 border-emerald-100">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+              <Stethoscope className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-gray-900 text-sm">Diagnostic Test</h3>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Take a 2-minute baseline reading to discover your proficiency level and track improvement.
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-3"
+                onClick={() => navigate('/diagnostic')}
+              >
+                Take baseline test
+              </Button>
+            </div>
+          </div>
+        </Card>
+
+        <Card className="bg-gradient-to-r from-purple-50 to-violet-50 border-purple-100">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center shrink-0">
+              <GraduationCap className="w-5 h-5 text-purple-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-gray-900 text-sm">IELTS Speaking Practice</h3>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Practise with real cue card prompts and get a band score estimate.
+              </p>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="mt-3"
+                onClick={() => navigate('/ielts')}
+              >
+                Start IELTS practice
+              </Button>
+            </div>
+          </div>
+        </Card>
+      </div>
 
       {/* Two-column bottom */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

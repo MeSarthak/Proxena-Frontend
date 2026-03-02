@@ -30,7 +30,17 @@ export type Category =
   | 'news'
   | 'travel'
   | 'academic'
-  | 'tongue_twisters';
+  | 'tongue_twisters'
+  | 'classic_literature'
+  | 'politics'
+  | 'geopolitics'
+  | 'speech'
+  | 'diplomatic'
+  | 'formal'
+  | 'sports'
+  | 'technology'
+  | 'diagnostic'
+  | 'ielts';
 
 export type Duration = 'short' | 'medium' | 'long';
 
@@ -54,6 +64,9 @@ export interface SessionSummary {
   overallAccuracy: number | null;
   fluencyScore: number | null;
   durationSeconds: number | null;
+  fillerCount: number;
+  wordsPerMinute: number | null;
+  speechHealthScore: number | null;
   createdAt: string;
   exerciseTitle?: string;
 }
@@ -70,6 +83,9 @@ export interface SessionDetail {
   overallAccuracy: number | null;
   fluencyScore: number | null;
   durationSeconds: number | null;
+  fillerCount: number;
+  wordsPerMinute: number | null;
+  speechHealthScore: number | null;
   createdAt: string;
   words: WordResult[];
   exercisePublicId?: string;
@@ -134,6 +150,10 @@ export interface WsSummaryMessage {
   overallAccuracy: number;
   fluencyScore: number;
   durationSeconds: number;
+  fillerCount: number;
+  wordsPerMinute: number;
+  speechHealthScore: number;
+  fillerWords: string[];
 }
 
 export interface WsErrorMessage {

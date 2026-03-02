@@ -89,6 +89,7 @@ export default function SessionPage() {
   const [searchParams] = useSearchParams();
   const exercisePublicId = searchParams.get('exercise');
   const isShadowMode = searchParams.get('mode') === 'shadow';
+  const isIeltsMode = searchParams.get('mode') === 'ielts';
   const isChallenge = searchParams.get('challenge') === '1';
   const navigate = useNavigate();
   const location = useLocation();
@@ -174,13 +175,17 @@ export default function SessionPage() {
   // Navigate to summary when done
   useEffect(() => {
     if (phase === 'done' && summary && sessionPublicId) {
+      if (isIeltsMode) {
+        navigate(`/ielts/summary/${sessionPublicId}`, { state: { summary } });
+        return;
+      }
       const params = new URLSearchParams();
       if (isChallenge) params.set('challenge', '1');
       if (isShadowMode) params.set('mode', 'shadow');
       const query = params.toString() ? `?${params.toString()}` : '';
       navigate(`/sessions/${sessionPublicId}${query}`, { state: { summary } });
     }
-  }, [phase, summary, sessionPublicId, navigate, isChallenge, isShadowMode]);
+  }, [phase, summary, sessionPublicId, navigate, isChallenge, isShadowMode, isIeltsMode]);
 
   // Space bar shortcut: start or stop recording
   useEffect(() => {

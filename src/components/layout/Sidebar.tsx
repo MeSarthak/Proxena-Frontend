@@ -9,6 +9,8 @@ import {
   Settings,
   Trophy,
   Zap,
+  Stethoscope,
+  GraduationCap,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
@@ -17,6 +19,8 @@ import { useXP } from '../../hooks/useXP';
 const nav = [
   { to: '/dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
   { to: '/exercises',    label: 'Exercises',    icon: BookOpen },
+  { to: '/diagnostic',   label: 'Diagnostic',   icon: Stethoscope },
+  { to: '/ielts',        label: 'IELTS Mode',   icon: GraduationCap },
   { to: '/challenges',   label: 'Challenges',   icon: Trophy },
   { to: '/analytics',   label: 'Analytics',    icon: BarChart2 },
   { to: '/subscription', label: 'Subscription', icon: CreditCard },

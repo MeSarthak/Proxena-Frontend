@@ -7,6 +7,8 @@ import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { WordRecommendations } from '../components/WordRecommendations';
+import { WeakSoundIntelligence } from '../components/WeakSoundIntelligence';
+import { WeakWordDrill } from '../components/WeakWordDrill';
 import { MilestoneToast, useToasts } from '../components/MilestoneToast';
 import { useXP, xpForSession } from '../hooks/useXP';
 import { useBadges } from '../hooks/useBadges';
@@ -17,6 +19,12 @@ import {
   scoreColor,
   scoreBg,
   motivationalFeedback,
+  speechHealthColor,
+  speechHealthLabel,
+  wpmColor,
+  wpmLabel,
+  fillerColor,
+  fillerLabel,
 } from '../lib/utils';
 import {
   RadialBarChart,
@@ -210,6 +218,11 @@ export default function SessionSummaryPage() {
   const duration = session?.durationSeconds?? inlineSummary?.durationSeconds ?? null;
   const words    = session?.words ?? [];
 
+  const fillerCount      = session?.fillerCount ?? inlineSummary?.fillerCount ?? 0;
+  const wordsPerMinute   = session?.wordsPerMinute ?? inlineSummary?.wordsPerMinute ?? null;
+  const speechHealth     = session?.speechHealthScore ?? inlineSummary?.speechHealthScore ?? null;
+  const fillerWords      = inlineSummary?.fillerWords ?? [];
+
   const feedback = accuracy != null ? motivationalFeedback(accuracy) : null;
 
   // Separate words by status
@@ -260,6 +273,92 @@ export default function SessionSummaryPage() {
               </span>
               <span className="text-xs text-gray-500 font-medium">Duration</span>
             </div>
+          </div>
+        </Card>
+
+        {/* Speech Intelligence */}
+        <Card className="mb-6">
+          <h2 className="font-semibold text-gray-900 mb-1">Speech Intelligence</h2>
+          <p className="text-xs text-gray-500 mb-4">Deep analytics from your session</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Speech Health Score */}
+            <div className="flex flex-col items-center gap-2 p-4 rounded-xl bg-gray-50">
+              <div className="relative w-20 h-20">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadialBarChart
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="70%"
+                    outerRadius="100%"
+                    startAngle={90}
+                    endAngle={-270}
+                    data={[{ value: speechHealth ?? 0, fill: '#10b981' }]}
+                    barSize={8}
+                  >
+                    <RadialBar
+                      dataKey="value"
+                      cornerRadius={8}
+                      background={{ fill: '#f3f4f6' }}
+                    />
+                  </RadialBarChart>
+                </ResponsiveContainer>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-lg font-bold ${speechHealthColor(speechHealth)}`}>
+                    {speechHealth != null ? speechHealth.toFixed(0) : '—'}
+                  </span>
+                </div>
+              </div>
+              <span className="text-xs font-medium text-gray-700">Health Score</span>
+              <span className={`text-xs font-medium ${speechHealthColor(speechHealth)}`}>
+                {speechHealthLabel(speechHealth)}
+              </span>
+            </div>
+
+            {/* Speaking Speed */}
+            <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-gray-50">
+              <span className={`text-3xl font-bold ${wpmColor(wordsPerMinute)}`}>
+                {wordsPerMinute != null ? wordsPerMinute.toFixed(0) : '—'}
+              </span>
+              <span className="text-xs font-medium text-gray-700">Words per minute</span>
+              <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                wordsPerMinute != null && wordsPerMinute >= 110 && wordsPerMinute <= 160
+                  ? 'bg-green-100 text-green-700'
+                  : wordsPerMinute != null
+                  ? 'bg-yellow-100 text-yellow-700'
+                  : 'bg-gray-100 text-gray-500'
+              }`}>
+                {wpmLabel(wordsPerMinute)}
+              </span>
+              <span className="text-xs text-gray-400 mt-1">Ideal: 110–160 WPM</span>
+            </div>
+
+            {/* Filler Words */}
+            <div className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-gray-50">
+              <span className={`text-3xl font-bold ${fillerColor(fillerCount)}`}>
+                {fillerCount}
+              </span>
+              <span className="text-xs font-medium text-gray-700">Filler words</span>
+              <span className={`text-xs font-medium ${fillerColor(fillerCount)}`}>
+                {fillerLabel(fillerCount)}
+              </span>
+              {fillerWords.length > 0 && (
+                <div className="flex flex-wrap justify-center gap-1 mt-1">
+                  {fillerWords.slice(0, 6).map((fw, i) => (
+                    <span key={i} className="px-1.5 py-0.5 bg-orange-50 border border-orange-200 text-orange-700 text-xs rounded-full">
+                      {fw}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Health score breakdown legend */}
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-400">
+              Health score = 40% Accuracy + 30% Fluency + 20% Speed + 10% Filler control
+            </p>
           </div>
         </Card>
 
@@ -318,6 +417,16 @@ export default function SessionSummaryPage() {
         {/* AI Word Coach */}
         <div className="mb-6">
           <WordRecommendations />
+        </div>
+
+        {/* Weak Sound Intelligence */}
+        <div className="mb-6">
+          <WeakSoundIntelligence />
+        </div>
+
+        {/* Weak Word Drill */}
+        <div className="mb-6">
+          <WeakWordDrill onPractice={() => navigate('/exercises')} />
         </div>
 
         {/* Actions */}

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { sessionsApi } from '../lib/api';
 import type { SessionSummary } from '../types';
 import { Card } from '../components/ui/Card';
-import { formatDate, formatPercent, scoreColor } from '../lib/utils';
+import { formatDate, formatPercent, scoreColor, speechHealthColor, wpmColor, fillerColor } from '../lib/utils';
 import {
   LineChart,
   Line,
@@ -19,6 +19,9 @@ interface ChartPoint {
   date: string;
   accuracy: number | null;
   fluency: number | null;
+  healthScore: number | null;
+  wpm: number | null;
+  fillers: number;
 }
 
 function EmptyChart() {
@@ -55,6 +58,9 @@ export default function AnalyticsPage() {
       date: new Date(s.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
       accuracy: s.overallAccuracy,
       fluency: s.fluencyScore,
+      healthScore: s.speechHealthScore,
+      wpm: s.wordsPerMinute,
+      fillers: s.fillerCount,
     }));
 
   // Weak sounds — words with Mispronunciation (from latest 5 sessions)
@@ -67,6 +73,19 @@ export default function AnalyticsPage() {
     sessions.length > 0
       ? sessions.reduce((acc, s) => acc + (s.fluencyScore ?? 0), 0) / sessions.length
       : null;
+
+  const avgHealthScore =
+    sessions.length > 0
+      ? sessions.reduce((acc, s) => acc + (s.speechHealthScore ?? 0), 0) / sessions.length
+      : null;
+
+  const avgWpm =
+    sessions.filter((s) => s.wordsPerMinute != null).length > 0
+      ? sessions.reduce((acc, s) => acc + (s.wordsPerMinute ?? 0), 0) /
+        sessions.filter((s) => s.wordsPerMinute != null).length
+      : null;
+
+  const totalFillers = sessions.reduce((acc, s) => acc + s.fillerCount, 0);
 
   const best = sessions.reduce<SessionSummary | null>(
     (b, s) => (!b || (s.overallAccuracy ?? 0) > (b.overallAccuracy ?? 0) ? s : b),
@@ -83,7 +102,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Summary stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
         <Card className="text-center">
           <p className="text-3xl font-bold text-gray-900">{total}</p>
           <p className="text-sm text-gray-500 mt-1">Total sessions</p>
@@ -99,6 +118,24 @@ export default function AnalyticsPage() {
             {formatPercent(avgFluency, 0)}
           </p>
           <p className="text-sm text-gray-500 mt-1">Avg. fluency</p>
+        </Card>
+        <Card className="text-center">
+          <p className={`text-3xl font-bold ${speechHealthColor(avgHealthScore)}`}>
+            {avgHealthScore != null ? avgHealthScore.toFixed(0) : '—'}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Avg. health</p>
+        </Card>
+        <Card className="text-center">
+          <p className={`text-3xl font-bold ${wpmColor(avgWpm)}`}>
+            {avgWpm != null ? avgWpm.toFixed(0) : '—'}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Avg. WPM</p>
+        </Card>
+        <Card className="text-center">
+          <p className={`text-3xl font-bold ${fillerColor(totalFillers)}`}>
+            {totalFillers}
+          </p>
+          <p className="text-sm text-gray-500 mt-1">Total fillers</p>
         </Card>
       </div>
 
@@ -157,6 +194,69 @@ export default function AnalyticsPage() {
         )}
       </Card>
 
+      {/* Speech Health + WPM trend */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <h2 className="font-semibold text-gray-900 mb-4">Speech Health Score</h2>
+          {loading ? (
+            <div className="h-44 skeleton" />
+          ) : chartData.length < 2 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, fontSize: 12 }} />
+                <Line type="monotone" dataKey="healthScore" name="Health Score" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
+        <Card>
+          <h2 className="font-semibold text-gray-900 mb-4">Speaking Speed (WPM)</h2>
+          {loading ? (
+            <div className="h-44 skeleton" />
+          ) : chartData.length < 2 ? (
+            <EmptyChart />
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                <YAxis domain={[60, 220]} tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+                <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, fontSize: 12 }} />
+                {/* Ideal range shading */}
+                <Line type="monotone" dataKey="wpm" name="WPM" stroke="#6366f1" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+          <p className="text-xs text-gray-400 mt-2">Ideal range: 110–160 WPM</p>
+        </Card>
+      </div>
+
+      {/* Filler word trend */}
+      <Card className="mb-6">
+        <h2 className="font-semibold text-gray-900 mb-4">Filler Words Over Time</h2>
+        {loading ? (
+          <div className="h-44 skeleton" />
+        ) : chartData.length < 2 ? (
+          <EmptyChart />
+        ) : (
+          <ResponsiveContainer width="100%" height={180}>
+            <LineChart data={chartData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} />
+              <Tooltip contentStyle={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, fontSize: 12 }} />
+              <Line type="monotone" dataKey="fillers" name="Filler words" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </Card>
+
       {/* Best session highlight */}
       {best && (
         <Card className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-green-100">
@@ -196,11 +296,14 @@ export default function AnalyticsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-xs text-gray-400 border-b border-gray-100">
-                    <th className="pb-2 font-medium">Date</th>
-                    <th className="pb-2 font-medium text-right">Accuracy</th>
-                    <th className="pb-2 font-medium text-right">Fluency</th>
-                    <th className="pb-2 font-medium text-right">Duration</th>
-                  </tr>
+                     <th className="pb-2 font-medium">Date</th>
+                     <th className="pb-2 font-medium text-right">Accuracy</th>
+                     <th className="pb-2 font-medium text-right">Fluency</th>
+                     <th className="pb-2 font-medium text-right">Health</th>
+                     <th className="pb-2 font-medium text-right hidden sm:table-cell">WPM</th>
+                     <th className="pb-2 font-medium text-right hidden sm:table-cell">Fillers</th>
+                     <th className="pb-2 font-medium text-right">Duration</th>
+                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {sessions.map((s) => (
@@ -220,6 +323,15 @@ export default function AnalyticsPage() {
                       </td>
                       <td className={`py-2.5 text-right font-semibold tabular-nums ${scoreColor(s.fluencyScore)}`}>
                         {formatPercent(s.fluencyScore, 0)}
+                      </td>
+                      <td className={`py-2.5 text-right font-semibold tabular-nums ${speechHealthColor(s.speechHealthScore)}`}>
+                        {s.speechHealthScore != null ? s.speechHealthScore.toFixed(0) : '—'}
+                      </td>
+                      <td className={`py-2.5 text-right tabular-nums hidden sm:table-cell ${wpmColor(s.wordsPerMinute)}`}>
+                        {s.wordsPerMinute != null ? s.wordsPerMinute.toFixed(0) : '—'}
+                      </td>
+                      <td className={`py-2.5 text-right tabular-nums hidden sm:table-cell ${fillerColor(s.fillerCount)}`}>
+                        {s.fillerCount}
                       </td>
                       <td className="py-2.5 text-right text-gray-500 tabular-nums">
                         {s.durationSeconds != null ? `${s.durationSeconds}s` : '—'}

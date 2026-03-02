@@ -10,17 +10,27 @@ import { difficultyColor, categoryLabel, durationLabel, durationColor } from '..
 import { useSpeechDemo } from '../hooks/useSpeechDemo';
 
 const CATEGORIES: { value: Category | ''; label: string; emoji: string }[] = [
-  { value: '',                label: 'All categories',  emoji: '🗂️' },
-  { value: 'conversation',   label: 'Conversation',    emoji: '💬' },
-  { value: 'storytelling',   label: 'Storytelling',    emoji: '📖' },
-  { value: 'emotions',       label: 'Emotions',        emoji: '💭' },
-  { value: 'interview',      label: 'Interview',       emoji: '🎙️' },
-  { value: 'daily',          label: 'Daily Life',      emoji: '☀️' },
-  { value: 'business',       label: 'Business',        emoji: '💼' },
-  { value: 'news',           label: 'News',            emoji: '📰' },
-  { value: 'travel',         label: 'Travel',          emoji: '✈️' },
-  { value: 'academic',       label: 'Academic',        emoji: '🎓' },
-  { value: 'tongue_twisters', label: 'Tongue Twisters', emoji: '🌀' },
+  { value: '',                  label: 'All categories',      emoji: '🗂️' },
+  { value: 'conversation',      label: 'Conversation',        emoji: '💬' },
+  { value: 'storytelling',      label: 'Storytelling',        emoji: '📖' },
+  { value: 'emotions',          label: 'Emotions',            emoji: '💭' },
+  { value: 'interview',         label: 'Interview',           emoji: '🎙️' },
+  { value: 'daily',             label: 'Daily Life',          emoji: '☀️' },
+  { value: 'business',          label: 'Business',            emoji: '💼' },
+  { value: 'news',              label: 'News',                emoji: '📰' },
+  { value: 'travel',            label: 'Travel',              emoji: '✈️' },
+  { value: 'academic',          label: 'Academic',            emoji: '🎓' },
+  { value: 'tongue_twisters',   label: 'Tongue Twisters',     emoji: '🌀' },
+  { value: 'classic_literature', label: 'Classic Literature', emoji: '📜' },
+  { value: 'politics',          label: 'Politics',            emoji: '🏛️' },
+  { value: 'geopolitics',       label: 'Geopolitics',         emoji: '🌍' },
+  { value: 'speech',            label: 'Speech',              emoji: '🎤' },
+  { value: 'diplomatic',        label: 'Diplomatic',          emoji: '🤝' },
+  { value: 'formal',            label: 'Formal',              emoji: '🎩' },
+  { value: 'sports',            label: 'Sports',              emoji: '⚽' },
+  { value: 'technology',        label: 'Technology',          emoji: '💻' },
+  { value: 'diagnostic',        label: 'Diagnostic',          emoji: '🩺' },
+  { value: 'ielts',             label: 'IELTS',               emoji: '🎓' },
 ];
 
 const DIFFICULTIES: { value: Difficulty | ''; label: string }[] = [
@@ -32,9 +42,9 @@ const DIFFICULTIES: { value: Difficulty | ''; label: string }[] = [
 
 const DURATIONS: { value: Duration | ''; label: string; sub: string }[] = [
   { value: '',       label: 'Any length', sub: '' },
-  { value: 'short',  label: 'Short',  sub: '~1 min' },
-  { value: 'medium', label: 'Medium', sub: '~3 min' },
-  { value: 'long',   label: 'Long',   sub: '5 min+' },
+  { value: 'short',  label: 'Short',  sub: '5–8 min' },
+  { value: 'medium', label: 'Medium', sub: '10–15 min' },
+  { value: 'long',   label: 'Long',   sub: '20–25 min' },
 ];
 
 const ACCENT_LABELS: Record<string, string> = {
