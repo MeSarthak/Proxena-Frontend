@@ -42,9 +42,9 @@ const DIFFICULTIES: { value: Difficulty | ''; label: string }[] = [
 
 const DURATIONS: { value: Duration | ''; label: string; sub: string }[] = [
   { value: '',       label: 'Any length', sub: '' },
-  { value: 'short',  label: 'Short',  sub: '5–8 min' },
-  { value: 'medium', label: 'Medium', sub: '10–15 min' },
-  { value: 'long',   label: 'Long',   sub: '20–25 min' },
+  { value: 'short',  label: 'Short',  sub: '< 30s' },
+  { value: 'medium', label: 'Medium', sub: '30s–1m' },
+  { value: 'long',   label: 'Long',   sub: '> 1m' },
 ];
 
 const ACCENT_LABELS: Record<string, string> = {

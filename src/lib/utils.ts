@@ -73,9 +73,9 @@ export function categoryLabel(c: string): string {
 }
 
 export function durationLabel(d: string | undefined): string {
-  if (d === 'short')  return '5–8 min';
-  if (d === 'medium') return '10–15 min';
-  if (d === 'long')   return '20–25 min';
+  if (d === 'short')  return '< 30s';
+  if (d === 'medium') return '30s–1m';
+  if (d === 'long')   return '> 1m';
   return '';
 }
 
